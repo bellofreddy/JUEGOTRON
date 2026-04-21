@@ -1,0 +1,95 @@
+.container {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none; /* Deja que los clicks pasen al 3D si es necesario */
+  font-family: 'Courier New', Courier, monospace;
+  color: #00ffff;
+}
+
+.scoreBoard {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  text-align: right;
+  text-shadow: 0 0 10px #00ffff;
+}
+
+.overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(5px);
+  pointer-events: all;
+}
+
+.playButton {
+  background: transparent;
+  border: 2px solid #00ffff;
+  color: #00ffff;
+  padding: 15px 30px;
+  font-size: 1.2rem;
+  cursor: pointer;
+  transition: all 0.3s;
+  box-shadow: 0 0 15px rgba(0, 255, 255, 0.3);
+}
+
+.playButton:hover {
+  background: #00ffff;
+  color: #000;
+  box-shadow: 0 0 30px #00ffff;
+}
+
+/* Portal Status Bar */
+.portalStatus {
+  position: absolute;
+  bottom: 40px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 300px;
+  text-align: center;
+}
+
+.statusLabel {
+  margin: 0 0 10px 0;
+  font-size: 0.9rem;
+  letter-spacing: 2px;
+  text-shadow: 0 0 10px rgba(0, 255, 255, 0.5);
+}
+
+.portalBar {
+  width: 100%;
+  height: 8px;
+  border: 2px solid #00ffff;
+  background: rgba(0, 30, 50, 0.8);
+  box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.5);
+  overflow: hidden;
+}
+
+.portalFill {
+  height: 100%;
+  background: linear-gradient(90deg, #00ffff, #ff0055);
+  width: 0%;
+  transition: width 0.1s linear;
+  box-shadow: 0 0 10px #00ffff, inset 0 0 5px rgba(255, 255, 255, 0.3);
+}
+
+.portalFill.active {
+  animation: portalPulse 0.5s ease-in-out infinite;
+  background: linear-gradient(90deg, #00ffff, #ff0055, #00ffff);
+  box-shadow: 0 0 20px #00ffff, 0 0 30px #ff0055;
+}
+
+@keyframes portalPulse {
+  0%, 100% {
+    box-shadow: 0 0 20px #00ffff, 0 0 30px #ff0055;
+  }
+  50% {
+    box-shadow: 0 0 30px #00ffff, 0 0 50px #ff0055;
+  }
+}
