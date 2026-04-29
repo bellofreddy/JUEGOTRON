@@ -11,18 +11,36 @@ export const useGameStore = create(
     showGameOverUI: false,
     score: 0,
     dimension: "GRID",
+    
+    // --- PORTAL 1: RED -> ESPACIO ---
     portalActive: false,
     portalCollected: false,
     
-    // --- NUEVO: SISTEMA DE CALIDAD ---
-    quality: 'high', // Valor inicial por defecto
+    // --- PORTAL 2: ESPACIO -> REALIDAD (NUEVO) ---
+    realPortalActive: false,
+    realPortalCollected: false,
+    
+    // --- SISTEMA DE CALIDAD ---
+    quality: 'high', 
     setQuality: (val) => set({ quality: val }),
-    // ---------------------------------
 
     moveLeft: () => set((state) => ({ lane: Math.max(state.lane - 1, -1) })),
     moveRight: () => set((state) => ({ lane: Math.min(state.lane + 1, 1) })),
-    setDimension: (dim) => set({ dimension: dim, portalCollected: true }),
+
+    // Modificado para manejar la transición entre las 3 dimensiones
+    setDimension: (dim) => set((state) => ({ 
+      dimension: dim, 
+      // Desactivamos visualmente los portales al cruzar
+      portalActive: false,
+      realPortalActive: false,
+      // Marcamos como recolectado el que corresponda para que no reaparezca
+      portalCollected: dim === "SPACE" ? true : state.portalCollected,
+      realPortalCollected: dim === "REAL" ? true : state.realPortalCollected
+    })),
+
+    // Funciones para activar los portales
     setPortalActive: (active) => set({ portalActive: active }),
+    setRealPortalActive: (active) => set({ realPortalActive: active }), // Esta es la que faltaba
 
     advanceGame: (delta) =>
       set((state) => ({
@@ -50,19 +68,8 @@ export const useGameStore = create(
         dimension: "GRID",
         portalActive: false,
         portalCollected: false,
+        realPortalActive: false,
+        realPortalCollected: false,
       }),
-
-    startGame: () =>
-      set({
-        lane: 0,
-        isGameOver: false,
-        showGameOverUI: false,
-        isPaused: false,
-        speed: 15,
-        score: 0,
-        dimension: "GRID",
-        portalActive: false,
-        portalCollected: false,
-      }),
-  })),
+  }))
 );

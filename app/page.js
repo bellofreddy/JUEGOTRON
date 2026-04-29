@@ -1,6 +1,6 @@
 // page.js
 "use client";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import Scene from "../store/ThreeEngine/Scene";
 import { useGameStore } from "../store/useGameStore";
 
@@ -600,6 +600,160 @@ function MainMenu({ quality, setQuality, onStart }) {
 /* ─────────────────────────────────────────
    COMPONENTE PRINCIPAL
 ───────────────────────────────────────── */
+function createGameMusic() {
+  if (typeof window === "undefined") return null;
+
+  const AudioContext = window.AudioContext || window.webkitAudioContext;
+  if (!AudioContext) return null;
+
+  const ctx = new AudioContext();
+  const master = ctx.createGain();
+  const compressor = ctx.createDynamicsCompressor();
+  const delay = ctx.createDelay(1.0);
+  const delayFeedback = ctx.createGain();
+  const delayWet = ctx.createGain();
+
+  master.gain.value = 0;
+  compressor.threshold.value = -18;
+  compressor.knee.value = 18;
+  compressor.ratio.value = 5;
+  compressor.attack.value = 0.01;
+  compressor.release.value = 0.18;
+
+  delay.delayTime.value = 0.19;
+  delayFeedback.gain.value = 0.22;
+  delayWet.gain.value = 0.18;
+
+  master.connect(compressor);
+  compressor.connect(ctx.destination);
+  master.connect(delay);
+  delay.connect(delayFeedback);
+  delayFeedback.connect(delay);
+  delay.connect(delayWet);
+  delayWet.connect(compressor);
+
+  const root = 55;
+  const bassPattern = [0, 0, 7, 0, 10, 7, 5, 3];
+  const arpPattern = [12, 19, 24, 19, 15, 22, 27, 22, 10, 17, 22, 17, 7, 15, 19, 15];
+  let step = 0;
+  let scheduler = null;
+
+  const freqFromSemitone = (semitone) => root * Math.pow(2, semitone / 12);
+
+  const playTone = (freq, time, duration, type, gainValue) => {
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    const filter = ctx.createBiquadFilter();
+
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, time);
+    filter.type = "lowpass";
+    filter.frequency.setValueAtTime(type === "sawtooth" ? 1100 : 2400, time);
+    filter.Q.setValueAtTime(0.8, time);
+    gain.gain.setValueAtTime(0.0001, time);
+    gain.gain.exponentialRampToValueAtTime(gainValue, time + 0.015);
+    gain.gain.exponentialRampToValueAtTime(0.0001, time + duration);
+
+    osc.connect(filter);
+    filter.connect(gain);
+    gain.connect(master);
+    osc.start(time);
+    osc.stop(time + duration + 0.05);
+  };
+
+  const playKick = (time) => {
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(95, time);
+    osc.frequency.exponentialRampToValueAtTime(38, time + 0.12);
+    gain.gain.setValueAtTime(0.45, time);
+    gain.gain.exponentialRampToValueAtTime(0.0001, time + 0.16);
+
+    osc.connect(gain);
+    gain.connect(master);
+    osc.start(time);
+    osc.stop(time + 0.18);
+  };
+
+  const playHat = (time, gainValue = 0.035) => {
+    const buffer = ctx.createBuffer(1, ctx.sampleRate * 0.04, ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < data.length; i++) {
+      data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / data.length, 2);
+    }
+
+    const noise = ctx.createBufferSource();
+    const gain = ctx.createGain();
+    const filter = ctx.createBiquadFilter();
+
+    noise.buffer = buffer;
+    filter.type = "highpass";
+    filter.frequency.value = 5500;
+    gain.gain.setValueAtTime(gainValue, time);
+    gain.gain.exponentialRampToValueAtTime(0.0001, time + 0.04);
+
+    noise.connect(filter);
+    filter.connect(gain);
+    gain.connect(master);
+    noise.start(time);
+    noise.stop(time + 0.05);
+  };
+
+  const scheduleStep = () => {
+    const { dimension, speed } = useGameStore.getState();
+    const time = ctx.currentTime + 0.06;
+    const isSpace = dimension === "SPACE";
+    const isReal = dimension === "REAL";
+    const tempoScale = Math.min(speed / 60, 1);
+    const beat = isSpace ? 0.15 : isReal ? 0.22 : 0.18;
+    const bassGain = isReal ? 0.045 : 0.075;
+    const arpGain = isReal ? 0.025 : isSpace ? 0.07 : 0.052;
+
+    if (step % 4 === 0) playKick(time);
+    if (step % 2 === 1) playHat(time, isSpace ? 0.055 : 0.035);
+
+    playTone(freqFromSemitone(bassPattern[step % bassPattern.length] - 12), time, beat * 1.5, "sawtooth", bassGain);
+    playTone(freqFromSemitone(arpPattern[step % arpPattern.length] + (isSpace ? 12 : 0)), time, beat * 0.8, "square", arpGain);
+
+    if (step % 8 === 0) {
+      const chord = isReal ? [0, 5, 10] : [0, 7, 10];
+      chord.forEach((note, i) => {
+        playTone(freqFromSemitone(note + 12), time + i * 0.015, beat * 5, "triangle", isReal ? 0.018 : 0.025);
+      });
+    }
+
+    step = (step + 1) % 64;
+    return Math.max(90, beat * 1000 - tempoScale * 22);
+  };
+
+  const tick = () => {
+    const nextMs = scheduleStep();
+    scheduler = window.setTimeout(tick, nextMs);
+  };
+
+  return {
+    async start() {
+      if (ctx.state === "suspended") await ctx.resume();
+      master.gain.cancelScheduledValues(ctx.currentTime);
+      master.gain.linearRampToValueAtTime(0.28, ctx.currentTime + 0.5);
+      if (!scheduler) tick();
+    },
+    setPaused(paused) {
+      master.gain.cancelScheduledValues(ctx.currentTime);
+      master.gain.linearRampToValueAtTime(paused ? 0.03 : 0.28, ctx.currentTime + 0.25);
+    },
+    stop() {
+      if (scheduler) window.clearTimeout(scheduler);
+      scheduler = null;
+      master.gain.cancelScheduledValues(ctx.currentTime);
+      master.gain.linearRampToValueAtTime(0.0001, ctx.currentTime + 0.25);
+      window.setTimeout(() => ctx.close(), 320);
+    },
+  };
+}
+
 export default function Home() {
   injectCSS();
 
@@ -612,6 +766,7 @@ export default function Home() {
   } = useGameStore();
 
   const [gameStarted, setGameStarted] = useState(false);
+  const musicRef = useRef(null);
 
   // Tecla ESC para pausar
   useEffect(() => {
@@ -623,14 +778,39 @@ export default function Home() {
     return () => window.removeEventListener("keydown", onKey);
   }, [gameStarted, togglePause]);
 
-  const handleStart = () => setGameStarted(true);
+  useEffect(() => {
+    if (!musicRef.current) return;
+    musicRef.current.setPaused(!gameStarted || isPaused || showGameOverUI);
+  }, [gameStarted, isPaused, showGameOverUI]);
+
+  useEffect(() => {
+    return () => {
+      musicRef.current?.stop();
+      musicRef.current = null;
+    };
+  }, []);
+
+  const stopMusic = () => {
+    musicRef.current?.stop();
+    musicRef.current = null;
+  };
+
+  const handleStart = () => {
+    setGameStarted(true);
+    if (!musicRef.current) {
+      musicRef.current = createGameMusic();
+    }
+    musicRef.current?.start();
+  };
 
   const handleRetry = () => {
+    stopMusic();
     resetGame();
     setGameStarted(false);
   };
 
   const handleQuit = () => {
+    stopMusic();
     resetGame();
     setGameStarted(false);
   };
