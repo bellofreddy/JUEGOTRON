@@ -176,21 +176,23 @@ function injectCSS() {
 const PORTAL_THRESHOLD = 300; // igual que Portal.jsx → PORTAL_SCORE_THRESHOLD
 
 function ProgressBar({ score, dimension, portalActive, portalCollected }) {
-  const isGrid   = dimension === "GRID";
-  const isSpace  = dimension === "SPACE";
-  const C        = isSpace ? "#ff6600" : "#00f7ff";          // color neón del vehículo
-  const GLOW     = isSpace
+  const isGrid = dimension === "GRID";
+  const isSpace = dimension === "SPACE";
+  const C = isSpace ? "#ff6600" : "#00f7ff"; // color neón del vehículo
+  const GLOW = isSpace
     ? "0 0 10px #ff6600, 0 0 22px rgba(255,102,0,0.55)"
     : "0 0 10px #00f7ff, 0 0 22px rgba(0,247,255,0.55)";
-  const FAINT    = isSpace ? "rgba(255,102,0,0.13)" : "rgba(0,247,255,0.13)";
+  const FAINT = isSpace ? "rgba(255,102,0,0.13)" : "rgba(0,247,255,0.13)";
 
   // ── Progreso real ──
   // · Antes del portal: 0 → ~99% (no llega a 100% hasta activarse)
   // · Portal activo (score ≥ 300): fijamos 100%
   // · SPACE: siempre 100% (ya pasaste)
-  const pct = isSpace ? 100
-    : portalActive ? 100
-    : Math.min((score / PORTAL_THRESHOLD) * 100, 99);
+  const pct = isSpace
+    ? 100
+    : portalActive
+      ? 100
+      : Math.min((score / PORTAL_THRESHOLD) * 100, 99);
 
   // Fase "CERCA": últimas 15% del trayecto (score ≥ 255) o portal ya spawneado
   const nearPortal = isGrid && (pct >= 85 || portalActive);
@@ -207,110 +209,154 @@ function ProgressBar({ score, dimension, portalActive, portalCollected }) {
         : `${Math.floor(score)} / ${PORTAL_THRESHOLD} m`;
 
   return (
-    <div style={{
-      position: "absolute",
-      // Zona exclusiva: top-0, altura 38px — el HUD empieza en top:44px
-      top: 0, left: 0, right: 0,
-      height: 38,
-      zIndex: 56,
-      pointerEvents: "none",
-    }}>
-
+    <div
+      style={{
+        position: "absolute",
+        // Zona exclusiva: top-0, altura 38px — el HUD empieza en top:44px
+        top: 0,
+        left: 0,
+        right: 0,
+        height: 38,
+        zIndex: 56,
+        pointerEvents: "none",
+      }}
+    >
       {/* Fondo semi-transparente solo en la franja de la barra */}
-      <div style={{
-        position: "absolute", inset: 0,
-        background: "linear-gradient(180deg, rgba(1,4,10,0.88) 60%, transparent 100%)",
-      }} />
+      <div
+        style={{
+          position: "absolute",
+          inset: 0,
+          background:
+            "linear-gradient(180deg, rgba(1,4,10,0.88) 60%, transparent 100%)",
+        }}
+      />
 
       {/* ══ CONTENIDO: centrado verticalmente en los 38px ══ */}
-      <div style={{
-        position: "absolute",
-        top: "50%", transform: "translateY(-50%)",
-        left: 0, right: 0,
-        display: "flex",
-        alignItems: "center",
-        gap: 10,
-        padding: "0 18px",
-      }}>
-
+      <div
+        style={{
+          position: "absolute",
+          top: "50%",
+          transform: "translateY(-50%)",
+          left: 0,
+          right: 0,
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
+          padding: "0 18px",
+        }}
+      >
         {/* ── ETIQUETA IZQUIERDA (vehículo) ── */}
-        <div style={{
-          flexShrink: 0,
-          display: "flex", alignItems: "center", gap: 5,
-          fontFamily: "var(--font-mono)",
-          fontSize: "0.52rem",
-          letterSpacing: "0.18em",
-          color: C,
-          textShadow: `0 0 8px ${C}`,
-          whiteSpace: "nowrap",
-          minWidth: 90,
-        }}>
-          <span style={{
-            display: "inline-block", width: 6, height: 6,
-            background: C,
-            clipPath: "polygon(50% 0%,100% 50%,50% 100%,0% 50%)",
-            boxShadow: `0 0 6px ${C}`,
-          }} />
+        <div
+          style={{
+            flexShrink: 0,
+            display: "flex",
+            alignItems: "center",
+            gap: 5,
+            fontFamily: "var(--font-mono)",
+            fontSize: "0.52rem",
+            letterSpacing: "0.18em",
+            color: C,
+            textShadow: `0 0 8px ${C}`,
+            whiteSpace: "nowrap",
+            minWidth: 90,
+          }}
+        >
+          <span
+            style={{
+              display: "inline-block",
+              width: 6,
+              height: 6,
+              background: C,
+              clipPath: "polygon(50% 0%,100% 50%,50% 100%,0% 50%)",
+              boxShadow: `0 0 6px ${C}`,
+            }}
+          />
           {isSpace ? "TRON SHIP" : "LIGHT CYCLE"}
         </div>
 
         {/* ── TRACK (ocupa todo el espacio central) ── */}
-        <div style={{
-          flex: 1,
-          position: "relative",
-          height: 5,
-          background: FAINT,
-          borderRadius: 3,
-        }}>
-          {/* Relleno */}
-          <div style={{
-            position: "absolute",
-            top: 0, left: 0, bottom: 0,
-            width: `${pct}%`,
-            background: `linear-gradient(90deg, ${C}44 0%, ${C} 100%)`,
+        <div
+          style={{
+            flex: 1,
+            position: "relative",
+            height: 5,
+            background: FAINT,
             borderRadius: 3,
-            transition: "width 0.4s ease",
-            boxShadow: GLOW,
-            animation: nearPortal
-              ? "progress-flash 0.5s ease infinite"
-              : "progress-glow 2.5s ease infinite",
-          }} />
+          }}
+        >
+          {/* Relleno */}
+          <div
+            style={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              bottom: 0,
+              width: `${pct}%`,
+              background: `linear-gradient(90deg, ${C}44 0%, ${C} 100%)`,
+              borderRadius: 3,
+              transition: "width 0.4s ease",
+              boxShadow: GLOW,
+              animation: nearPortal
+                ? "progress-flash 0.5s ease infinite"
+                : "progress-glow 2.5s ease infinite",
+            }}
+          />
 
           {/* Punta viajera (solo cuando avanza) */}
           {pct > 1 && pct < 100 && (
-            <div style={{
-              position: "absolute",
-              top: "50%",
-              left: `calc(${pct}% - 4px)`,
-              transform: "translateY(-50%)",
-              width: 8, height: 8,
-              borderRadius: "50%",
-              background: "#fff",
-              boxShadow: `0 0 5px #fff, 0 0 12px ${C}, 0 0 24px ${C}`,
-              transition: "left 0.4s ease",
-            }} />
+            <div
+              style={{
+                position: "absolute",
+                top: "50%",
+                left: `calc(${pct}% - 4px)`,
+                transform: "translateY(-50%)",
+                width: 8,
+                height: 8,
+                borderRadius: "50%",
+                background: "#fff",
+                boxShadow: `0 0 5px #fff, 0 0 12px ${C}, 0 0 24px ${C}`,
+                transition: "left 0.4s ease",
+              }}
+            />
           )}
 
           {/* Icono portal al final del track (solo GRID) */}
           {isGrid && (
-            <div style={{
-              position: "absolute",
-              right: -14, top: "50%",
-              transform: "translateY(-50%)",
-            }}>
-              <svg width="14" height="14" viewBox="0 0 14 14" overflow="visible">
+            <div
+              style={{
+                position: "absolute",
+                right: -14,
+                top: "50%",
+                transform: "translateY(-50%)",
+              }}
+            >
+              <svg
+                width="14"
+                height="14"
+                viewBox="0 0 14 14"
+                overflow="visible"
+              >
                 {/* Anillo exterior — se ilumina al activarse */}
-                <circle cx="7" cy="7" r="5.5" fill="none"
+                <circle
+                  cx="7"
+                  cy="7"
+                  r="5.5"
+                  fill="none"
                   stroke={portalReady ? C : `${C}40`}
                   strokeWidth="1.4"
                   style={{
                     filter: portalReady ? `drop-shadow(0 0 5px ${C})` : "none",
                     transition: "all 0.5s ease",
-                    animation: portalReady ? "progress-flash 0.5s ease infinite" : "none",
+                    animation: portalReady
+                      ? "progress-flash 0.5s ease infinite"
+                      : "none",
                   }}
                 />
                 {/* Núcleo — aparece cuando el portal está activo */}
-                <circle cx="7" cy="7" r="2.5"
+                <circle
+                  cx="7"
+                  cy="7"
+                  r="2.5"
                   fill={portalReady ? `${C}88` : "none"}
                   stroke={portalReady ? "#fff" : `${C}22`}
                   strokeWidth="0.8"
@@ -322,22 +368,25 @@ function ProgressBar({ score, dimension, portalActive, portalCollected }) {
         </div>
 
         {/* ── ETIQUETA DERECHA (estado) ── */}
-        <div style={{
-          flexShrink: 0,
-          fontFamily: "var(--font-mono)",
-          fontSize: "0.52rem",
-          letterSpacing: "0.14em",
-          color: nearPortal ? "#fff" : `${C}99`,
-          textShadow: nearPortal ? `0 0 10px ${C}` : "none",
-          whiteSpace: "nowrap",
-          minWidth: 150,
-          textAlign: "right",
-          animation: portalReady ? "progress-flash 0.6s ease infinite" : "none",
-          transition: "color 0.3s ease",
-        }}>
+        <div
+          style={{
+            flexShrink: 0,
+            fontFamily: "var(--font-mono)",
+            fontSize: "0.52rem",
+            letterSpacing: "0.14em",
+            color: nearPortal ? "#fff" : `${C}99`,
+            textShadow: nearPortal ? `0 0 10px ${C}` : "none",
+            whiteSpace: "nowrap",
+            minWidth: 150,
+            textAlign: "right",
+            animation: portalReady
+              ? "progress-flash 0.6s ease infinite"
+              : "none",
+            transition: "color 0.3s ease",
+          }}
+        >
           {label}
         </div>
-
       </div>
     </div>
   );
@@ -346,28 +395,69 @@ function ProgressBar({ score, dimension, portalActive, portalCollected }) {
 /* ── Componente: HUD de puntuación ── */
 function HUD({ score, isPaused, togglePause, dimension }) {
   return (
-    <div style={{
-      position: "absolute",
-      // Empieza justo debajo de la ProgressBar (38px) con 10px de margen
-      top: 48, left: 0, right: 0,
-      display: "flex",
-      justifyContent: "space-between",
-      alignItems: "flex-start",
-      padding: "0 20px",
-      pointerEvents: "none",
-      animation: "slide-in-top 0.5s ease both",
-      zIndex: 50,
-    }}>
+    <div
+      style={{
+        position: "absolute",
+        // Empieza justo debajo de la ProgressBar (38px) con 10px de margen
+        top: 48,
+        left: 0,
+        right: 0,
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "flex-start",
+        padding: "0 20px",
+        pointerEvents: "none",
+        animation: "slide-in-top 0.5s ease both",
+        zIndex: 50,
+      }}
+    >
       {/* Score + sistema */}
-      <div style={{ position: "relative", padding: "12px 20px", background: "rgba(0,4,10,0.7)", border: "1px solid rgba(0,247,255,0.25)" }}>
-        <div className="corner-tl" /><div className="corner-tr" /><div className="corner-bl" /><div className="corner-br" />
-        <div style={{ fontFamily: "var(--font-mono)", fontSize: "0.62rem", color: "rgba(0,247,255,0.5)", letterSpacing: "0.2em", marginBottom: 4 }}>
+      <div
+        style={{
+          position: "relative",
+          padding: "12px 20px",
+          background: "rgba(0,4,10,0.7)",
+          border: "1px solid rgba(0,247,255,0.25)",
+        }}
+      >
+        <div className="corner-tl" />
+        <div className="corner-tr" />
+        <div className="corner-bl" />
+        <div className="corner-br" />
+        <div
+          style={{
+            fontFamily: "var(--font-mono)",
+            fontSize: "0.62rem",
+            color: "rgba(0,247,255,0.5)",
+            letterSpacing: "0.2em",
+            marginBottom: 4,
+          }}
+        >
           SISTEMA: JUEGOTRON-{dimension === "SPACE" ? "ALFA" : "GRID"}
         </div>
         <div className="hud-bar" />
-        <div style={{ fontFamily: "var(--font-display)", fontSize: "1.6rem", fontWeight: 900, color: "#fff", textShadow: "0 0 16px var(--cyan)", letterSpacing: "0.08em", marginTop: 6 }}>
+        <div
+          style={{
+            fontFamily: "var(--font-display)",
+            fontSize: "1.6rem",
+            fontWeight: 900,
+            color: "#fff",
+            textShadow: "0 0 16px var(--cyan)",
+            letterSpacing: "0.08em",
+            marginTop: 6,
+          }}
+        >
           {String(Math.floor(score)).padStart(6, "0")}
-          <span style={{ fontFamily: "var(--font-mono)", fontSize: "0.7rem", color: "var(--cyan)", marginLeft: 8 }}>m</span>
+          <span
+            style={{
+              fontFamily: "var(--font-mono)",
+              fontSize: "0.7rem",
+              color: "var(--cyan)",
+              marginLeft: 8,
+            }}
+          >
+            m
+          </span>
         </div>
       </div>
 
@@ -396,96 +486,265 @@ function HUD({ score, isPaused, togglePause, dimension }) {
 /* ── Componente: Menú de Pausa ── */
 function PauseMenu({ onResume, onQuit }) {
   return (
-    <div style={{
-      position: "absolute", inset: 0,
-      display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center",
-      background: "rgba(0,4,10,0.82)",
-      backdropFilter: "blur(6px)",
-      zIndex: 80,
-      animation: "fade-in 0.2s ease",
-    }}>
+    <div
+      style={{
+        position: "absolute",
+        inset: 0,
+        display: "flex",
+        flexDirection: "column",
+        justifyContent: "center",
+        alignItems: "center",
+        background: "rgba(0,4,10,0.82)",
+        backdropFilter: "blur(6px)",
+        zIndex: 80,
+        animation: "fade-in 0.2s ease",
+      }}
+    >
       {/* Spinner decorativo */}
       <svg width="80" height="80" style={{ marginBottom: 24 }}>
-        <circle cx="40" cy="40" r="36" fill="none" stroke="rgba(0,247,255,0.15)" strokeWidth="1.5" />
-        <circle cx="40" cy="40" r="36" fill="none" stroke="var(--cyan)" strokeWidth="1.5"
-          strokeDasharray="60 166" style={{ animation: "spin 3s linear infinite", transformOrigin: "center" }} />
-        <text x="40" y="46" textAnchor="middle" fill="var(--cyan)"
-          style={{ fontFamily: "var(--font-display)", fontSize: "11px", fontWeight: 700, letterSpacing: "0.1em" }}>PAUSA</text>
+        <circle
+          cx="40"
+          cy="40"
+          r="36"
+          fill="none"
+          stroke="rgba(0,247,255,0.15)"
+          strokeWidth="1.5"
+        />
+        <circle
+          cx="40"
+          cy="40"
+          r="36"
+          fill="none"
+          stroke="var(--cyan)"
+          strokeWidth="1.5"
+          strokeDasharray="60 166"
+          style={{
+            animation: "spin 3s linear infinite",
+            transformOrigin: "center",
+          }}
+        />
+        <text
+          x="40"
+          y="46"
+          textAnchor="middle"
+          fill="var(--cyan)"
+          style={{
+            fontFamily: "var(--font-display)",
+            fontSize: "11px",
+            fontWeight: 700,
+            letterSpacing: "0.1em",
+          }}
+        >
+          PAUSA
+        </text>
       </svg>
 
-      <button className="btn" onClick={onResume} style={{
-        background: "var(--cyan)", color: "var(--dark)",
-        padding: "14px 48px", fontSize: "0.85rem", letterSpacing: "0.2em",
-        marginBottom: 14, boxShadow: "0 0 24px var(--cyan)",
-      }}>CONTINUAR</button>
+      <button
+        className="btn"
+        onClick={onResume}
+        style={{
+          background: "var(--cyan)",
+          color: "var(--dark)",
+          padding: "14px 48px",
+          fontSize: "0.85rem",
+          letterSpacing: "0.2em",
+          marginBottom: 14,
+          boxShadow: "0 0 24px var(--cyan)",
+        }}
+      >
+        CONTINUAR
+      </button>
 
-      <button className="btn" onClick={onQuit} style={{
-        background: "transparent", color: "rgba(255,255,255,0.45)",
-        border: "1px solid rgba(255,255,255,0.15)",
-        padding: "10px 48px", fontSize: "0.75rem", letterSpacing: "0.2em",
-      }}>SALIR AL MENÚ</button>
+      <button
+        className="btn"
+        onClick={onQuit}
+        style={{
+          background: "transparent",
+          color: "rgba(255,255,255,0.45)",
+          border: "1px solid rgba(255,255,255,0.15)",
+          padding: "10px 48px",
+          fontSize: "0.75rem",
+          letterSpacing: "0.2em",
+        }}
+      >
+        SALIR AL MENÚ
+      </button>
     </div>
   );
 }
 
 /* ── Componente: Pantalla de Game Over ── */
 function GameOverScreen({ score, onRetry }) {
+ 
+  const { highScore, history } = useGameStore();
+  const finalScore = Math.floor(score);
+  const isNewRecord = finalScore >= highScore && finalScore > 0;
+
   return (
-    <div style={{
-      position: "absolute", inset: 0,
-      display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center",
-      background: "rgba(0,0,0,0.88)",
-      backdropFilter: "blur(8px)",
-      zIndex: 100,
-      animation: "fade-in 0.4s ease",
-    }}>
-      {/* Título con glitch */}
-      <div style={{ position: "relative", marginBottom: 8 }}>
-        <h2 style={{
-          fontFamily: "var(--font-display)", fontWeight: 900,
-          fontSize: "clamp(2.5rem, 8vw, 5rem)",
-          color: "var(--pink)",
-          textShadow: "0 0 30px var(--pink), 0 0 60px rgba(255,0,85,0.4)",
-          letterSpacing: "0.06em",
-          animation: "flicker 4s ease infinite",
-        }}>CONEXIÓN PERDIDA</h2>
-        {/* Glitch layer */}
-        <h2 aria-hidden style={{
-          position: "absolute", inset: 0,
-          fontFamily: "var(--font-display)", fontWeight: 900,
-          fontSize: "clamp(2.5rem, 8vw, 5rem)",
-          color: "var(--cyan)", letterSpacing: "0.06em",
-          animation: "glitch 2.5s steps(1) infinite",
-          opacity: 0.6,
-        }}>CONEXIÓN PERDIDA</h2>
+    <div
+      style={{
+        position: "absolute",
+        inset: 0,
+        display: "flex",
+        flexDirection: "column",
+        justifyContent: "center",
+        alignItems: "center",
+        background: "rgba(0,0,0,0.92)",
+        backdropFilter: "blur(10px)",
+        zIndex: 100,
+        animation: "fade-in 0.4s ease",
+      }}
+    >
+      {/* Título Principal */}
+      <div
+        style={{ position: "relative", marginBottom: 20, textAlign: "center" }}
+      >
+        <h2
+          style={{
+            fontFamily: "var(--font-display)",
+            fontWeight: 900,
+            fontSize: "clamp(2rem, 6vw, 4rem)",
+            color: "var(--pink)",
+            textShadow: "0 0 30px var(--pink)",
+            letterSpacing: "0.06em",
+            animation: "flicker 4s ease infinite",
+          }}
+        >
+          CONEXIÓN PERDIDA
+        </h2>
       </div>
 
-      {/* Score */}
-      <div style={{
-        fontFamily: "var(--font-mono)", fontSize: "1.1rem",
-        color: "rgba(255,255,255,0.5)", marginBottom: 6, letterSpacing: "0.15em",
-        animation: "slide-in-bottom 0.5s 0.2s ease both",
-      }}>DISTANCIA FINAL</div>
-      <div style={{
-        fontFamily: "var(--font-display)", fontWeight: 900,
-        fontSize: "clamp(2rem, 6vw, 3.5rem)",
-        color: "#fff", textShadow: "0 0 20px rgba(255,255,255,0.4)",
-        letterSpacing: "0.1em", marginBottom: 40,
-        animation: "slide-in-bottom 0.5s 0.3s ease both",
-      }}>
-        {Math.floor(score).toLocaleString()}
-        <span style={{ fontFamily: "var(--font-mono)", fontSize: "1rem", color: "var(--cyan)", marginLeft: 10 }}>m</span>
+      {/* Puntaje de la Partida Actual */}
+      <div style={{ textAlign: "center", marginBottom: 30 }}>
+        <div
+          style={{
+            fontFamily: "var(--font-mono)",
+            color: "rgba(255,255,255,0.5)",
+            fontSize: "0.9rem",
+            letterSpacing: "0.2em",
+          }}
+        >
+          DISTANCIA RECORRIDA
+        </div>
+        <div
+          style={{
+            fontFamily: "var(--font-display)",
+            fontSize: "3.5rem",
+            color: "#fff",
+            textShadow: isNewRecord
+              ? "0 0 20px var(--cyan)"
+              : "0 0 20px var(--pink)",
+          }}
+        >
+          {finalScore}
+          <span
+            style={{ fontSize: "1rem", color: "var(--cyan)", marginLeft: 5 }}
+          >
+            m
+          </span>
+        </div>
+        {isNewRecord && (
+          <div
+            style={{
+              fontFamily: "var(--font-mono)",
+              color: "var(--cyan)",
+              fontSize: "0.7rem",
+              marginTop: -5,
+              animation: "pulse-border 2s infinite",
+            }}
+          >
+            ¡NUEVO RÉCORD DEL SISTEMA DETECTADO!
+          </div>
+        )}
       </div>
 
-      {/* Línea decorativa */}
-      <div style={{ width: 200, height: 1, background: "linear-gradient(90deg, transparent, var(--pink), transparent)", marginBottom: 40 }} />
+      {/* ── CONTENEDOR DEL HISTORIAL (LOG) ── */}
+      <div
+        style={{
+          width: "min(350px, 90vw)",
+          background: "rgba(0, 247, 255, 0.03)",
+          border: "1px solid rgba(0, 247, 255, 0.15)",
+          padding: "20px",
+          marginBottom: "40px",
+          position: "relative",
+        }}
+      >
+        {/* Decoradores de esquinas rectos */}
+        <div className="corner-tl" /> <div className="corner-br" />
+        <div
+          style={{
+            fontFamily: "var(--font-mono)",
+            fontSize: "0.65rem",
+            color: "var(--cyan)",
+            marginBottom: "15px",
+            letterSpacing: "0.3em",
+            borderBottom: "1px solid rgba(0, 247, 255, 0.2)",
+            paddingBottom: "8px",
+          }}
+        >
+          DATOS DE SINCRONIZACIÓN RECIENTES
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+          {history.length > 0 ? (
+            history.map((prevScore, index) => (
+              <div
+                key={index}
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  fontFamily: "var(--font-mono)",
+                  fontSize: "0.85rem",
+                  // El primer elemento es el más reciente
+                  color: index === 0 ? "#fff" : "rgba(255,255,255,0.35)",
+                  padding: "4px 8px",
+                  background:
+                    index === 0 ? "rgba(255,255,255,0.05)" : "transparent",
+                }}
+              >
+                <span>
+                  {index === 0
+                    ? "▸ ACTUAL"
+                    : `INTENTO_${history.length - index}`}
+                </span>
+                <span
+                  style={{
+                    color: prevScore === highScore ? "var(--cyan)" : "inherit",
+                  }}
+                >
+                  {prevScore}m {prevScore === highScore && "★"}
+                </span>
+              </div>
+            ))
+          ) : (
+            <div
+              style={{
+                fontFamily: "var(--font-mono)",
+                fontSize: "0.8rem",
+                color: "rgba(255,255,255,0.2)",
+              }}
+            >
+              NO HAY REGISTROS PREVIOS
+            </div>
+          )}
+        </div>
+      </div>
 
-      <button className="btn" onClick={onRetry} style={{
-        background: "var(--pink)", color: "#fff",
-        padding: "16px 56px", fontSize: "0.9rem", letterSpacing: "0.2em",
-        boxShadow: "0 0 30px rgba(255,0,85,0.5)",
-        animation: "slide-in-bottom 0.5s 0.5s ease both",
-      }}>REINTENTAR CONEXIÓN</button>
+      {/* Botón de Reintento */}
+      <button
+        className="btn"
+        onClick={onRetry}
+        style={{
+          background: "var(--pink)",
+          color: "#fff",
+          padding: "16px 56px",
+          fontSize: "0.9rem",
+          letterSpacing: "0.2em",
+          boxShadow: "0 0 30px rgba(255,0,85,0.5)",
+        }}
+      >
+        REINICIAR INTERFAZ
+      </button>
     </div>
   );
 }
@@ -493,74 +752,140 @@ function GameOverScreen({ score, onRetry }) {
 /* ── Componente: Menú Principal ── */
 function MainMenu({ quality, setQuality, onStart }) {
   const [hovered, setHovered] = useState(false);
-
+  const highScore = useGameStore((state) => state.highScore);
   const QUALITY_OPTIONS = [
-    { id: "low",    label: "BAJA",  sub: "60+ FPS" },
+    { id: "low", label: "BAJA", sub: "60+ FPS" },
     { id: "medium", label: "MEDIA", sub: "30-60 FPS" },
-    { id: "high",   label: "ALTA",  sub: "GPU req." },
+    { id: "high", label: "ALTA", sub: "GPU req." },
   ];
 
   return (
-    <div style={{
-      position: "absolute", inset: 0,
-      display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center",
-      background: "radial-gradient(ellipse at 50% 60%, rgba(0,60,80,0.45) 0%, rgba(0,4,10,0.95) 70%)",
-      backdropFilter: "blur(2px)",
-      zIndex: 200,
-    }}>
-
+    <div
+      style={{
+        position: "absolute",
+        inset: 0,
+        display: "flex",
+        flexDirection: "column",
+        justifyContent: "center",
+        alignItems: "center",
+        background:
+          "radial-gradient(ellipse at 50% 60%, rgba(0,60,80,0.45) 0%, rgba(0,4,10,0.95) 70%)",
+        backdropFilter: "blur(2px)",
+        zIndex: 200,
+      }}
+    >
       {/* Logo superior */}
-      <div style={{ marginBottom: 8, animation: "slide-in-top 0.7s ease both" }}>
-        <div style={{ fontFamily: "var(--font-mono)", fontSize: "0.65rem", color: "rgba(0,247,255,0.4)", letterSpacing: "0.4em", textAlign: "center", marginBottom: 10 }}>
+      <div
+        style={{ marginBottom: 8, animation: "slide-in-top 0.7s ease both" }}
+      >
+        <div
+          style={{
+            fontFamily: "var(--font-mono)",
+            fontSize: "0.65rem",
+            color: "rgba(0,247,255,0.4)",
+            letterSpacing: "0.4em",
+            textAlign: "center",
+            marginBottom: 10,
+          }}
+        >
           ▸ SISTEMA OPERATIVO v3.1.4 ◂
         </div>
-        <h1 style={{
-          fontFamily: "var(--font-display)", fontWeight: 900,
-          fontSize: "clamp(3rem, 10vw, 6.5rem)",
-          color: "var(--cyan)",
-          textShadow: "0 0 40px var(--cyan), 0 0 80px rgba(0,247,255,0.3)",
-          letterSpacing: "0.12em", lineHeight: 1,
-          animation: "flicker 6s ease infinite",
-        }}>NEONGAME</h1>
-        <div style={{
-          fontFamily: "var(--font-display)", fontWeight: 400,
-          fontSize: "clamp(0.7rem, 2vw, 1rem)",
-          color: "rgba(0,247,255,0.5)",
-          letterSpacing: "0.55em", textAlign: "right",
-          marginTop: 4,
-        }}>3 D · E D I T I O N</div>
+        <h1
+          style={{
+            fontFamily: "var(--font-display)",
+            fontWeight: 900,
+            fontSize: "clamp(3rem, 10vw, 6.5rem)",
+            color: "var(--cyan)",
+            textShadow: "0 0 40px var(--cyan), 0 0 80px rgba(0,247,255,0.3)",
+            letterSpacing: "0.12em",
+            lineHeight: 1,
+            animation: "flicker 6s ease infinite",
+          }}
+        >
+          NEONGAME
+        </h1>
+        <div
+          style={{
+            fontFamily: "var(--font-display)",
+            fontWeight: 400,
+            fontSize: "clamp(0.7rem, 2vw, 1rem)",
+            color: "rgba(0,247,255,0.5)",
+            letterSpacing: "0.55em",
+            textAlign: "right",
+            marginTop: 4,
+          }}
+        >
+          3 D · E D I T I O N
+        </div>
       </div>
 
       {/* Línea divisora */}
-      <div style={{ width: "min(340px, 80vw)", height: 1, background: "linear-gradient(90deg, transparent, var(--cyan), transparent)", margin: "28px 0", animation: "fade-in 1s 0.3s ease both", opacity: 0 }} />
+      <div
+        style={{
+          width: "min(340px, 80vw)",
+          height: 1,
+          background:
+            "linear-gradient(90deg, transparent, var(--cyan), transparent)",
+          margin: "28px 0",
+          animation: "fade-in 1s 0.3s ease both",
+          opacity: 0,
+        }}
+      />
 
       {/* Selector de calidad */}
-      <div style={{ animation: "slide-in-bottom 0.6s 0.2s ease both", opacity: 0 }}>
-        <div style={{
-          fontFamily: "var(--font-mono)", fontSize: "0.62rem",
-          color: "rgba(0,247,255,0.45)", letterSpacing: "0.25em",
-          textAlign: "center", marginBottom: 14,
-        }}>CALIDAD DE TRANSMISIÓN</div>
+      <div
+        style={{ animation: "slide-in-bottom 0.6s 0.2s ease both", opacity: 0 }}
+      >
+        <div
+          style={{
+            fontFamily: "var(--font-mono)",
+            fontSize: "0.62rem",
+            color: "rgba(0,247,255,0.45)",
+            letterSpacing: "0.25em",
+            textAlign: "center",
+            marginBottom: 14,
+          }}
+        >
+          CALIDAD DE TRANSMISIÓN
+        </div>
 
-        <div style={{ display: "flex", gap: 10, justifyContent: "center", marginBottom: 40 }}>
+        <div
+          style={{
+            display: "flex",
+            gap: 10,
+            justifyContent: "center",
+            marginBottom: 40,
+          }}
+        >
           {QUALITY_OPTIONS.map((q) => (
             <div key={q.id} style={{ textAlign: "center" }}>
               <button
                 className={`quality-pill ${quality === q.id ? "active" : ""}`}
                 onClick={() => setQuality(q.id)}
-              >{q.label}</button>
-              <div style={{
-                fontFamily: "var(--font-mono)", fontSize: "0.55rem",
-                color: quality === q.id ? "var(--cyan)" : "rgba(255,255,255,0.2)",
-                letterSpacing: "0.1em", marginTop: 5,
-              }}>{q.sub}</div>
+              >
+                {q.label}
+              </button>
+              <div
+                style={{
+                  fontFamily: "var(--font-mono)",
+                  fontSize: "0.55rem",
+                  color:
+                    quality === q.id ? "var(--cyan)" : "rgba(255,255,255,0.2)",
+                  letterSpacing: "0.1em",
+                  marginTop: 5,
+                }}
+              >
+                {q.sub}
+              </div>
             </div>
           ))}
         </div>
       </div>
 
       {/* Botón de inicio */}
-      <div style={{ animation: "slide-in-bottom 0.6s 0.4s ease both", opacity: 0 }}>
+      <div
+        style={{ animation: "slide-in-bottom 0.6s 0.4s ease both", opacity: 0 }}
+      >
         <button
           className="btn"
           onMouseEnter={() => setHovered(true)}
@@ -578,17 +903,26 @@ function MainMenu({ quality, setQuality, onStart }) {
               : "0 0 12px rgba(0,247,255,0.2)",
             animation: hovered ? "none" : "pulse-border 2.5s ease infinite",
           }}
-        >INICIAR SECUENCIA</button>
+        >
+          INICIAR SECUENCIA
+        </button>
       </div>
 
       {/* Controles */}
-      <div style={{
-        position: "absolute", bottom: 28,
-        fontFamily: "var(--font-mono)", fontSize: "0.6rem",
-        color: "rgba(255,255,255,0.2)", letterSpacing: "0.15em",
-        display: "flex", gap: 24,
-        animation: "fade-in 1s 0.8s ease both", opacity: 0,
-      }}>
+      <div
+        style={{
+          position: "absolute",
+          bottom: 28,
+          fontFamily: "var(--font-mono)",
+          fontSize: "0.6rem",
+          color: "rgba(255,255,255,0.2)",
+          letterSpacing: "0.15em",
+          display: "flex",
+          gap: 24,
+          animation: "fade-in 1s 0.8s ease both",
+          opacity: 0,
+        }}
+      >
         <span>[A/D] CARRIL</span>
         <span>[W/S] ALTURA</span>
         <span>[ESC] PAUSA</span>
@@ -634,7 +968,9 @@ function createGameMusic() {
 
   const root = 55;
   const bassPattern = [0, 0, 7, 0, 10, 7, 5, 3];
-  const arpPattern = [12, 19, 24, 19, 15, 22, 27, 22, 10, 17, 22, 17, 7, 15, 19, 15];
+  const arpPattern = [
+    12, 19, 24, 19, 15, 22, 27, 22, 10, 17, 22, 17, 7, 15, 19, 15,
+  ];
   let step = 0;
   let scheduler = null;
 
@@ -714,13 +1050,33 @@ function createGameMusic() {
     if (step % 4 === 0) playKick(time);
     if (step % 2 === 1) playHat(time, isSpace ? 0.055 : 0.035);
 
-    playTone(freqFromSemitone(bassPattern[step % bassPattern.length] - 12), time, beat * 1.5, "sawtooth", bassGain);
-    playTone(freqFromSemitone(arpPattern[step % arpPattern.length] + (isSpace ? 12 : 0)), time, beat * 0.8, "square", arpGain);
+    playTone(
+      freqFromSemitone(bassPattern[step % bassPattern.length] - 12),
+      time,
+      beat * 1.5,
+      "sawtooth",
+      bassGain,
+    );
+    playTone(
+      freqFromSemitone(
+        arpPattern[step % arpPattern.length] + (isSpace ? 12 : 0),
+      ),
+      time,
+      beat * 0.8,
+      "square",
+      arpGain,
+    );
 
     if (step % 8 === 0) {
       const chord = isReal ? [0, 5, 10] : [0, 7, 10];
       chord.forEach((note, i) => {
-        playTone(freqFromSemitone(note + 12), time + i * 0.015, beat * 5, "triangle", isReal ? 0.018 : 0.025);
+        playTone(
+          freqFromSemitone(note + 12),
+          time + i * 0.015,
+          beat * 5,
+          "triangle",
+          isReal ? 0.018 : 0.025,
+        );
       });
     }
 
@@ -742,7 +1098,10 @@ function createGameMusic() {
     },
     setPaused(paused) {
       master.gain.cancelScheduledValues(ctx.currentTime);
-      master.gain.linearRampToValueAtTime(paused ? 0.03 : 0.28, ctx.currentTime + 0.25);
+      master.gain.linearRampToValueAtTime(
+        paused ? 0.03 : 0.28,
+        ctx.currentTime + 0.25,
+      );
     },
     stop() {
       if (scheduler) window.clearTimeout(scheduler);
@@ -758,14 +1117,20 @@ export default function Home() {
   injectCSS();
 
   const {
-    score, showGameOverUI, resetGame,
-    quality, setQuality,
-    isPaused, togglePause,
+    score,
+    showGameOverUI,
+    resetGame,
+    quality,
+    setQuality,
+    isPaused,
+    togglePause,
     dimension,
-    portalActive, portalCollected,
+    portalActive,
+    portalCollected,
+    gameStarted, // ← Añade esta
+    startGame,
   } = useGameStore();
 
-  const [gameStarted, setGameStarted] = useState(false);
   const musicRef = useRef(null);
 
   // Tecla ESC para pausar
@@ -796,7 +1161,8 @@ export default function Home() {
   };
 
   const handleStart = () => {
-    setGameStarted(true);
+    // 3. Llamamos a la función de la Store
+    startGame();
     if (!musicRef.current) {
       musicRef.current = createGameMusic();
     }
@@ -805,26 +1171,28 @@ export default function Home() {
 
   const handleRetry = () => {
     stopMusic();
-    resetGame();
-    setGameStarted(false);
+    resetGame(); // resetGame ya pone gameStarted: false internamente
   };
 
   const handleQuit = () => {
     stopMusic();
-    resetGame();
-    setGameStarted(false);
+    resetGame(); // resetGame ya pone gameStarted: false internamente
   };
 
   return (
-    <main style={{
-      width: "100vw", height: "100vh",
-      background: "#000",
-      position: "relative",
-      overflow: "hidden",
-      fontFamily: "var(--font-display)",
-    }}>
+    <main
+      style={{
+        width: "100vw",
+        height: "100vh",
+        background: "#000",
+        position: "relative",
+        overflow: "hidden",
+        fontFamily: "var(--font-display)",
+      }}
+    >
       {/* Motor 3D siempre montado */}
-      <Scene />
+      {/* Envía el estado al Scene */}
+      <Scene gameStarted={gameStarted} />
 
       {/* HUD en juego */}
       {gameStarted && !showGameOverUI && (
@@ -850,13 +1218,15 @@ export default function Home() {
       )}
 
       {/* Game Over */}
-      {showGameOverUI && (
-        <GameOverScreen score={score} onRetry={handleRetry} />
-      )}
+      {showGameOverUI && <GameOverScreen score={score} onRetry={handleRetry} />}
 
       {/* Menú principal */}
       {!gameStarted && (
-        <MainMenu quality={quality} setQuality={setQuality} onStart={handleStart} />
+        <MainMenu
+          quality={quality}
+          setQuality={setQuality}
+          onStart={handleStart}
+        />
       )}
     </main>
   );

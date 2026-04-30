@@ -1,4 +1,3 @@
-// useGameStore.js
 import { create } from "zustand";
 import { subscribeWithSelector } from "zustand/middleware";
 
@@ -10,13 +9,18 @@ export const useGameStore = create(
     isGameOver: false,
     showGameOverUI: false,
     score: 0,
-    dimension: "GRID",
     
-    // --- PORTAL 1: RED -> ESPACIO ---
+    // --- PERSISTENCIA ---
+    highScore: typeof window !== 'undefined' ? Number(localStorage.getItem('juegotron_highscore')) || 0 : 0,
+    // Recuperamos el historial del localStorage o iniciamos un array vacío
+    history: typeof window !== 'undefined' ? JSON.parse(localStorage.getItem('juegotron_history')) || [] : [],
+    
+    dimension: "GRID",
+    gameStarted: false, 
+    
+    // --- PORTALES ---
     portalActive: false,
     portalCollected: false,
-    
-    // --- PORTAL 2: ESPACIO -> REALIDAD (NUEVO) ---
     realPortalActive: false,
     realPortalCollected: false,
     
@@ -27,29 +31,59 @@ export const useGameStore = create(
     moveLeft: () => set((state) => ({ lane: Math.max(state.lane - 1, -1) })),
     moveRight: () => set((state) => ({ lane: Math.min(state.lane + 1, 1) })),
 
-    // Modificado para manejar la transición entre las 3 dimensiones
     setDimension: (dim) => set((state) => ({ 
       dimension: dim, 
-      // Desactivamos visualmente los portales al cruzar
       portalActive: false,
       realPortalActive: false,
-      // Marcamos como recolectado el que corresponda para que no reaparezca
       portalCollected: dim === "SPACE" ? true : state.portalCollected,
       realPortalCollected: dim === "REAL" ? true : state.realPortalCollected
     })),
 
-    // Funciones para activar los portales
     setPortalActive: (active) => set({ portalActive: active }),
-    setRealPortalActive: (active) => set({ realPortalActive: active }), // Esta es la que faltaba
+    setRealPortalActive: (active) => set({ realPortalActive: active }),
+
+    startGame: () => set({ 
+      gameStarted: true, 
+      isPaused: false, 
+      isGameOver: false, 
+      showGameOverUI: false 
+    }),
 
     advanceGame: (delta) =>
-      set((state) => ({
-        speed: Math.min(state.speed + 0.2 * delta, 60),
-        score: state.score + delta * 10,
-      })),
+      set((state) => {
+        const newScore = state.score + delta * 10;
+        const newSpeed = Math.min(state.speed + 0.2 * delta, 60);
+        
+        if (newScore > state.highScore) {
+          localStorage.setItem('juegotron_highscore', Math.floor(newScore));
+          return { score: newScore, speed: newSpeed, highScore: Math.floor(newScore) };
+        }
+        
+        return { score: newScore, speed: newSpeed };
+      }),
 
     setGameOver: () => {
-      set({ isGameOver: true, isPaused: true, speed: 0 });
+      set((state) => {
+        const finalScore = Math.floor(state.score);
+        
+        // --- ACTUALIZAR HISTORIAL ---
+        // Creamos la nueva lista con el puntaje actual al inicio
+        const newHistory = [finalScore, ...state.history].slice(0, 5);
+        
+        // Guardamos en localStorage para que no se pierda al recargar
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('juegotron_history', JSON.stringify(newHistory));
+        }
+
+        return { 
+          isGameOver: true, 
+          isPaused: true, 
+          speed: 0,
+          history: newHistory // Actualizamos el estado
+        };
+      });
+
+      // Retraso de 2 segundos para mostrar el cartel de Game Over
       setTimeout(() => {
         set({ showGameOverUI: true });
       }, 2000);
@@ -66,6 +100,7 @@ export const useGameStore = create(
         speed: 15,
         score: 0,
         dimension: "GRID",
+        gameStarted: false, 
         portalActive: false,
         portalCollected: false,
         realPortalActive: false,

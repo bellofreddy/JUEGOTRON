@@ -15,31 +15,31 @@ import {
 import { QUALITY_SETTINGS } from "../constants";
 import { useGameStore } from "../useGameStore";
 
-import Portal           from "./Portal";
-import RealPortal       from "./Realportal";
-import TronShip         from "./TronShip";
-import Explosion        from "./Explosion";
-import LightCycle       from "./LightCycle";
-import Grid             from "./Grid";
-import Obstacles        from "./Obstacles";
-import GameObstacles    from "./GameObstacles";
-import SpaceLandscape   from "./SpaceLandscape";
+import Portal from "./Portal";
+import RealPortal from "./Realportal";
+import TronShip from "./TronShip";
+import Explosion from "./Explosion";
+import LightCycle from "./LightCycle";
+import Grid from "./Grid";
+import Obstacles from "./Obstacles";
+import GameObstacles from "./GameObstacles";
+import SpaceLandscape from "./SpaceLandscape";
 import RealWorldLandscape from "./RealWorldLandscape";
 
 const LANE_X_POSITIONS = { "-1": -5, 0: 0, 1: 5 };
 
 // ── Color de fondo por dimensión ─────────────────────────────────────────────
 const BG_COLOR = {
-  GRID:  "#01040a",
+  GRID: "#01040a",
   SPACE: "#01040a",
-  REAL:  "#2a2a2e",   // asfalto — si se cuela algún pixel es invisible
+  REAL: "#2a2a2e", // asfalto — si se cuela algún pixel es invisible
 };
 
 // ── Niebla por dimensión ──────────────────────────────────────────────────────
 const FOG_COLOR = {
-  GRID:  "#01040a",
+  GRID: "#01040a",
   SPACE: "#01040a",
-  REAL:  "#c8e8f5",   // niebla blanca-azulada en el horizonte
+  REAL: "#c8e8f5", // niebla blanca-azulada en el horizonte
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -49,7 +49,7 @@ function CameraRig() {
     state.camera.fov = THREE.MathUtils.lerp(
       state.camera.fov,
       42 + speed * 0.4,
-      0.05
+      0.05,
     );
     state.camera.updateProjectionMatrix();
 
@@ -62,13 +62,14 @@ function CameraRig() {
   return null;
 }
 
-function GameLogic() {
-  const isPaused    = useGameStore((state) => state.isPaused);
-  const isGameOver  = useGameStore((state) => state.isGameOver);
+function GameLogic({ gameStarted }) {
+  const isPaused = useGameStore((state) => state.isPaused);
+  const isGameOver = useGameStore((state) => state.isGameOver);
   const advanceGame = useGameStore((state) => state.advanceGame);
 
   useFrame((_, delta) => {
-    if (!isPaused && !isGameOver) advanceGame(delta);
+    if (gameStarted && !isPaused && !isGameOver) 
+      advanceGame(delta);
   });
   return null;
 }
@@ -77,9 +78,12 @@ function GameLogic() {
 function PostFX({ dimension, quality, settings }) {
   const isReal = dimension === "REAL";
   return (
-    <EffectComposer disableNormalPass multisampling={quality === "high" ? 8 : 0}>
+    <EffectComposer
+      disableNormalPass
+      multisampling={quality === "high" ? 8 : 0}
+    >
       <Bloom
-        luminanceThreshold={isReal ? 0.9 : 0.2}   // en el mundo real casi nada brilla
+        luminanceThreshold={isReal ? 0.9 : 0.2} // en el mundo real casi nada brilla
         mipmapBlur={quality !== "low"}
         intensity={isReal ? 0.3 : settings.bloomIntensity}
         radius={0.4}
@@ -97,18 +101,18 @@ function PostFX({ dimension, quality, settings }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-export default function Scene() {
+export default function Scene({ gameStarted }) {
   const isGameOver = useGameStore((state) => state.isGameOver);
-  const lane       = useGameStore((state) => state.lane);
-  const dimension  = useGameStore((state) => state.dimension);
-  const quality    = useGameStore((state) => state.quality);
-  const settings   = useMemo(() => QUALITY_SETTINGS[quality], [quality]);
+  const lane = useGameStore((state) => state.lane);
+  const dimension = useGameStore((state) => state.dimension);
+  const quality = useGameStore((state) => state.quality);
+  const settings = useMemo(() => QUALITY_SETTINGS[quality], [quality]);
 
-  const isReal  = dimension === "REAL";
+  const isReal = dimension === "REAL";
   const isSpace = dimension === "SPACE";
-  const isGrid  = dimension === "GRID";
+  const isGrid = dimension === "GRID";
 
-  const bgColor  = BG_COLOR[dimension]  ?? "#01040a";
+  const bgColor = BG_COLOR[dimension] ?? "#01040a";
   const fogColor = FOG_COLOR[dimension] ?? "#01040a";
 
   return (
@@ -124,7 +128,7 @@ export default function Scene() {
         }}
       >
         <Suspense fallback={null}>
-          <GameLogic />
+         <GameLogic gameStarted={gameStarted} />
           <color attach="background" args={[bgColor]} />
 
           {/* Niebla: muy corta en mundo real para efecto de horizonte */}
@@ -147,10 +151,8 @@ export default function Scene() {
           <CameraRig />
 
           {/* ── Luces base — se adaptan por dimensión ── */}
-          {isReal ? (
-            // Mundo real: luz solar cálida (las luces específicas están en RealWorldLandscape)
-            null
-          ) : (
+          {isReal ? // Mundo real: luz solar cálida (las luces específicas están en RealWorldLandscape)
+          null : (
             <>
               <ambientLight intensity={0.15} />
               <directionalLight
@@ -167,15 +169,15 @@ export default function Scene() {
           <RealPortal />
 
           {/* ── Paisajes ── */}
-          {isGrid  && <Grid />}
+          {isGrid && <Grid />}
           {isSpace && <SpaceLandscape />}
-          {isReal  && <RealWorldLandscape />}
+          {isReal && <RealWorldLandscape />}
 
           {/* ── Obstáculos de decoración (edificios) — solo GRID y SPACE ── */}
           {!isReal && <Obstacles />}
 
           {/* ── Obstáculos de juego (barreras/discos) — solo GRID y SPACE ── */}
-          <GameObstacles />
+          {gameStarted && <GameObstacles />}
 
           {/* ── Vehículo o explosión ── */}
           {isGameOver ? (
@@ -209,4 +211,3 @@ export default function Scene() {
     </div>
   );
 }
-      
