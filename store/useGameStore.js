@@ -12,7 +12,6 @@ export const useGameStore = create(
     
     // --- PERSISTENCIA ---
     highScore: typeof window !== 'undefined' ? Number(localStorage.getItem('juegotron_highscore')) || 0 : 0,
-    // Recuperamos el historial del localStorage o iniciamos un array vacío
     history: typeof window !== 'undefined' ? JSON.parse(localStorage.getItem('juegotron_history')) || [] : [],
     
     dimension: "GRID",
@@ -23,6 +22,12 @@ export const useGameStore = create(
     portalCollected: false,
     realPortalActive: false,
     realPortalCollected: false,
+
+    // --- PRE-CARGA DE DIMENSIONES ---
+    // Se activan antes de llegar al portal para que React monte el componente
+    // en segundo plano, evitando el spike de CPU al cruzar
+    spacePreloaded: false,
+    realPreloaded: false,
     
     // --- SISTEMA DE CALIDAD ---
     quality: 'high', 
@@ -36,11 +41,17 @@ export const useGameStore = create(
       portalActive: false,
       realPortalActive: false,
       portalCollected: dim === "SPACE" ? true : state.portalCollected,
-      realPortalCollected: dim === "REAL" ? true : state.realPortalCollected
+      realPortalCollected: dim === "REAL" ? true : state.realPortalCollected,
+      // Al entrar en SPACE, marcamos el real como "listo para precargar"
+      spacePreloaded: dim === "SPACE" ? true : state.spacePreloaded,
     })),
 
     setPortalActive: (active) => set({ portalActive: active }),
     setRealPortalActive: (active) => set({ realPortalActive: active }),
+
+    // Activa la pre-carga silenciosa del siguiente landscape
+    triggerSpacePreload: () => set({ spacePreloaded: true }),
+    triggerRealPreload:  () => set({ realPreloaded:  true }),
 
     startGame: () => set({ 
       gameStarted: true, 
@@ -65,25 +76,17 @@ export const useGameStore = create(
     setGameOver: () => {
       set((state) => {
         const finalScore = Math.floor(state.score);
-        
-        // --- ACTUALIZAR HISTORIAL ---
-        // Creamos la nueva lista con el puntaje actual al inicio
         const newHistory = [finalScore, ...state.history].slice(0, 5);
-        
-        // Guardamos en localStorage para que no se pierda al recargar
         if (typeof window !== 'undefined') {
           localStorage.setItem('juegotron_history', JSON.stringify(newHistory));
         }
-
         return { 
           isGameOver: true, 
           isPaused: true, 
           speed: 0,
-          history: newHistory // Actualizamos el estado
+          history: newHistory
         };
       });
-
-      // Retraso de 2 segundos para mostrar el cartel de Game Over
       setTimeout(() => {
         set({ showGameOverUI: true });
       }, 2000);
@@ -105,6 +108,8 @@ export const useGameStore = create(
         portalCollected: false,
         realPortalActive: false,
         realPortalCollected: false,
+        spacePreloaded: false,
+        realPreloaded: false,
       }),
   }))
 );

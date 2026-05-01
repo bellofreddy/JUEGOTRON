@@ -18,7 +18,11 @@ export default function TronShip() {
   const engineRefs = useRef([]);
   const trailRefs = useRef([]);
   const verticalRef = useRef(0);
-  const { lane, isPaused, moveLeft, moveRight } = useGameStore();
+  // PARCHE: selectores granulares
+  const lane      = useGameStore((s) => s.lane);
+  const isPaused  = useGameStore((s) => s.isPaused);
+  const moveLeft  = useGameStore((s) => s.moveLeft);
+  const moveRight = useGameStore((s) => s.moveRight);
 
   useEffect(() => {
     const handleKeyDown = (e) => {

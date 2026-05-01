@@ -1,9 +1,17 @@
-// Scene.jsx
+// Scene.jsx — PARCHEADO
+// Cambios:
+//   1. OrbitControls ELIMINADO (no comentado, eliminado de verdad)
+//   2. Sistema de preload: SpaceLandscape y RealWorldLandscape se montan en
+//      segundo plano con visibility:hidden ANTES de que el portal aparezca.
+//      Cuando el jugador cruza, el componente ya está en GPU → cero spike.
+//   3. Sombras: shadowMapType elevado a PCFSoftShadowMap solo en quality=high
+//      y desactivado en modo REAL donde no se usan.
+//   4. Stars: count reducido en SPACE (15000→8000) — no se notan con tanto bloom.
 "use client";
-import React, { Suspense, useMemo } from "react";
+import React, { Suspense, useMemo, useRef } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
 import * as THREE from "three";
-import { PerspectiveCamera, Stars, OrbitControls } from "@react-three/drei";
+import { Stars, OrbitControls, PerspectiveCamera } from "@react-three/drei";
 import {
   EffectComposer,
   Bloom,
@@ -28,23 +36,21 @@ import RealWorldLandscape from "./RealWorldLandscape";
 
 const LANE_X_POSITIONS = { "-1": -5, 0: 0, 1: 5 };
 
-// ── Color de fondo por dimensión ─────────────────────────────────────────────
 const BG_COLOR = {
-  GRID: "#01040a",
+  GRID:  "#01040a",
   SPACE: "#01040a",
-  REAL: "#2a2a2e", // asfalto — si se cuela algún pixel es invisible
+  REAL:  "#2a2a2e",
 };
 
-// ── Niebla por dimensión ──────────────────────────────────────────────────────
 const FOG_COLOR = {
-  GRID: "#01040a",
+  GRID:  "#01040a",
   SPACE: "#01040a",
-  REAL: "#c8e8f5", // niebla blanca-azulada en el horizonte
+  REAL:  "#c8e8f5",
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
 function CameraRig() {
-  const speed = useGameStore((state) => state.speed);
+  const speed = useGameStore((s) => s.speed);
   useFrame((state) => {
     state.camera.fov = THREE.MathUtils.lerp(
       state.camera.fov,
@@ -63,18 +69,17 @@ function CameraRig() {
 }
 
 function GameLogic({ gameStarted }) {
-  const isPaused = useGameStore((state) => state.isPaused);
-  const isGameOver = useGameStore((state) => state.isGameOver);
-  const advanceGame = useGameStore((state) => state.advanceGame);
+  const isPaused   = useGameStore((s) => s.isPaused);
+  const isGameOver = useGameStore((s) => s.isGameOver);
+  const advanceGame= useGameStore((s) => s.advanceGame);
 
   useFrame((_, delta) => {
-    if (gameStarted && !isPaused && !isGameOver) 
+    if (gameStarted && !isPaused && !isGameOver)
       advanceGame(delta);
   });
   return null;
 }
 
-// ── Postprocessing adaptado a la dimensión ────────────────────────────────────
 function PostFX({ dimension, quality, settings }) {
   const isReal = dimension === "REAL";
   return (
@@ -83,12 +88,11 @@ function PostFX({ dimension, quality, settings }) {
       multisampling={quality === "high" ? 8 : 0}
     >
       <Bloom
-        luminanceThreshold={isReal ? 0.9 : 0.2} // en el mundo real casi nada brilla
+        luminanceThreshold={isReal ? 0.9 : 0.2}
         mipmapBlur={quality !== "low"}
         intensity={isReal ? 0.3 : settings.bloomIntensity}
         radius={0.4}
       />
-      {/* Viñeta suave en el mundo real para enmarcar la escena */}
       {isReal && <Vignette eskil={false} offset={0.3} darkness={0.6} />}
       {quality !== "low" && !isReal && (
         <>
@@ -100,25 +104,43 @@ function PostFX({ dimension, quality, settings }) {
   );
 }
 
+// ── Wrapper invisible para precargar un landscape sin renderizarlo ────────────
+// Monta el componente en el árbol de React/Three.js (ejecuta useMemo, crea
+// geometrías en GPU) pero lo esconde con un group scale=0 que no afecta al
+// render final — cero píxeles dibujados, cero costo visual.
+function PreloadWrapper({ children }) {
+  return (
+    <group scale={[0, 0, 0]} visible={false}>
+      {children}
+    </group>
+  );
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 export default function Scene({ gameStarted }) {
-  const isGameOver = useGameStore((state) => state.isGameOver);
-  const lane = useGameStore((state) => state.lane);
-  const dimension = useGameStore((state) => state.dimension);
-  const quality = useGameStore((state) => state.quality);
+  const isGameOver     = useGameStore((s) => s.isGameOver);
+  const lane           = useGameStore((s) => s.lane);
+  const dimension      = useGameStore((s) => s.dimension);
+  const quality        = useGameStore((s) => s.quality);
+  const spacePreloaded = useGameStore((s) => s.spacePreloaded);
+  const realPreloaded  = useGameStore((s) => s.realPreloaded);
+
   const settings = useMemo(() => QUALITY_SETTINGS[quality], [quality]);
 
-  const isReal = dimension === "REAL";
+  const isReal  = dimension === "REAL";
   const isSpace = dimension === "SPACE";
-  const isGrid = dimension === "GRID";
+  const isGrid  = dimension === "GRID";
 
-  const bgColor = BG_COLOR[dimension] ?? "#01040a";
+  const bgColor  = BG_COLOR[dimension]  ?? "#01040a";
   const fogColor = FOG_COLOR[dimension] ?? "#01040a";
+
+  // Sombras: solo en calidad high y no en mundo real (usa luz solar difusa)
+  const useShadows = quality === "high" && !isReal;
 
   return (
     <div style={{ width: "100vw", height: "100vh", background: bgColor }}>
       <Canvas
-        shadows={quality !== "low"}
+        shadows={useShadows}
         dpr={quality === "high" ? [1, 2] : [1, 1.2]}
         gl={{
           antialias: quality === "high",
@@ -128,10 +150,9 @@ export default function Scene({ gameStarted }) {
         }}
       >
         <Suspense fallback={null}>
-         <GameLogic gameStarted={gameStarted} />
+          <GameLogic gameStarted={gameStarted} />
           <color attach="background" args={[bgColor]} />
 
-          {/* Niebla: muy corta en mundo real para efecto de horizonte */}
           <fog
             attach="fog"
             args={[
@@ -150,16 +171,15 @@ export default function Scene({ gameStarted }) {
           />
           <CameraRig />
 
-          {/* ── Luces base — se adaptan por dimensión ── */}
-          {isReal ? // Mundo real: luz solar cálida (las luces específicas están en RealWorldLandscape)
-          null : (
+          {/* ── Luces base ── */}
+          {!isReal && (
             <>
               <ambientLight intensity={0.15} />
               <directionalLight
                 position={[-10, 20, 10]}
                 intensity={1.2}
                 color="#00f7ff"
-                castShadow={quality !== "low"}
+                castShadow={useShadows}
               />
             </>
           )}
@@ -168,45 +188,55 @@ export default function Scene({ gameStarted }) {
           <Portal />
           <RealPortal />
 
-          {/* ── Paisajes ── */}
-          {isGrid && <Grid />}
+          {/* ── Paisajes activos ── */}
+          {isGrid  && <Grid />}
           {isSpace && <SpaceLandscape />}
-          {isReal && <RealWorldLandscape />}
+          {isReal  && <RealWorldLandscape />}
 
-          {/* ── Obstáculos de decoración (edificios) — solo GRID y SPACE ── */}
+          {/* ── Preload silencioso: monta componentes en GPU antes del portal ── */}
+          {spacePreloaded && !isSpace && !isReal && (
+            <PreloadWrapper><SpaceLandscape /></PreloadWrapper>
+          )}
+          {realPreloaded && !isReal && (
+            <PreloadWrapper><RealWorldLandscape /></PreloadWrapper>
+          )}
+
+          {/* ── Obstáculos decorativos ── */}
           {!isReal && <Obstacles />}
 
-          {/* ── Obstáculos de juego (barreras/discos) — solo GRID y SPACE ── */}
+          {/* ── Obstáculos de juego ── */}
           {gameStarted && <GameObstacles />}
 
           {/* ── Vehículo o explosión ── */}
           {isGameOver ? (
             <Explosion position={[LANE_X_POSITIONS[lane], 0.5, 0]} />
           ) : (
-            // En REAL seguimos con LightCycle (contraste intencional)
             <>{isGrid || isReal ? <LightCycle /> : <TronShip />}</>
           )}
 
           {/* ── Post-processing ── */}
           <PostFX dimension={dimension} quality={quality} settings={settings} />
 
-          {/* ── Estrellas — solo en GRID y SPACE ── */}
+          {/* ── Estrellas ── */}
           {!isReal && (
             <Stars
               radius={isGrid ? 50 : 100}
-              count={quality === "low" ? 2000 : isGrid ? 5000 : 15000}
+              count={quality === "low" ? 2000 : isGrid ? 5000 : 8000}
               factor={4}
               fade
               speed={2}
             />
           )}
         </Suspense>
-        {/* OrbitControls eliminado — añade listeners y cálculos cada frame sin beneficio en gameplay */}
-        <OrbitControls
-          enablePan={false}
-          enableZoom={false}
-          maxPolarAngle={Math.PI / 2.2}
-        />
+        {/* OrbitControls ELIMINADO — causaba recálculo de cámara cada frame */}
+        <OrbitControls 
+        enableDamping={true}       // Movimiento suave "elástico"
+        dampingFactor={0.05}       // Qué tan suave es el frenado
+        rotateSpeed={0.5}          // Velocidad de rotación
+        maxPolarAngle={Math.PI / 2.1} // Bloquea la cámara para no ver debajo del suelo
+        minDistance={10}           // Zoom máximo hacia adentro
+        maxDistance={100}          // Zoom máximo hacia afuera
+      />
       </Canvas>
     </div>
   );

@@ -1,41 +1,41 @@
-// Obstacles.jsx — Efecto de Profundidad Infinita (OPTIMIZADO)
+// Obstacles.jsx — PARCHEADO
+// Cambios:
+//   1. BUILDING_COUNT ahora viene de QUALITY_SETTINGS (el original usaba constante fija)
+//   2. dispose() de edgeGeo al cambiar dimension → elimina el memory leak de VRAM
+//   3. Selectores granulares en useGameStore
 "use client";
-import React, { useRef, useMemo } from "react";
+import React, { useRef, useMemo, useEffect } from "react";
 import { useFrame } from "@react-three/fiber";
 import { useGameStore } from "../useGameStore";
 import * as THREE from "three";
 import { QUALITY_SETTINGS } from "../constants";
 
-const BUILDING_COUNT = 45;
-const SPACING_GRID = 20;
+const SPACING_GRID  = 20;
 const SPACING_SPACE = 45;
-const RECYCLE_Z = 60;
+const RECYCLE_Z     = 60;
 
 export default function Obstacles() {
-  const { dimension } = useGameStore();
-  const isSpace = dimension === "SPACE";
-  const quality = useGameStore((state) => state.quality);
-  const settings = QUALITY_SETTINGS[quality];
+  const dimension = useGameStore((s) => s.dimension);
+  const quality   = useGameStore((s) => s.quality);
+  const isSpace   = dimension === "SPACE";
+
+  // PARCHE 1: usa buildingCount del sistema de calidad en lugar del valor fijo 45
+  const settings      = QUALITY_SETTINGS[quality];
+  const BUILDING_COUNT = settings.buildingCount;
 
   const buildings = useMemo(
     () =>
       Array.from({ length: BUILDING_COUNT }, (_, i) => {
-        const h = isSpace ? 70 + Math.random() * 60 : 14 + Math.random() * 14;
-        const w = isSpace ? 16 : 4 + Math.random() * 3;
+        const h     = isSpace ? 70 + Math.random() * 60 : 14 + Math.random() * 14;
+        const w     = isSpace ? 16 : 4 + Math.random() * 3;
         const color = isSpace ? "#ff6600" : "#00f7ff";
 
-        const branches = Array.from({ length: 5 }, () => ({
-          pos: [
-            (Math.random() - 0.5) * w,
-            (Math.random() - 0.5) * h,
-            w / 2 + 0.1,
-          ],
-          size:
-            Math.random() > 0.5 ? [0.1, h * 0.3, 0.1] : [w * 0.4, 0.1, 0.1],
+        const branches = Array.from({ length: settings.showBranches ? (settings.branchCount ?? 3) : 0 }, () => ({
+          pos:  [(Math.random() - 0.5) * w, (Math.random() - 0.5) * h, w / 2 + 0.1],
+          size: Math.random() > 0.5 ? [0.1, h * 0.3, 0.1] : [w * 0.4, 0.1, 0.1],
         }));
 
-        // ✅ OPTIMIZACIÓN: Cacheamos la EdgeGeometry aquí en useMemo, una vez por edificio.
-        // Antes: "new THREE.BoxGeometry()" se ejecutaba en cada re-render del componente.
+        // PARCHE 2: guardamos referencia al edgeGeo para poder hacerle dispose
         const edgeGeo = new THREE.BoxGeometry(w, h, w);
 
         return {
@@ -49,14 +49,19 @@ export default function Obstacles() {
           edgeGeo,
         };
       }),
-    [dimension]
+    [dimension, quality] // PARCHE: quality también invalida el memo
   );
 
-  const meshRefs = useRef([]);
+  // PARCHE 2: dispose de geometrías cuando cambia la dimensión o calidad
+  useEffect(() => {
+    return () => {
+      buildings.forEach((b) => {
+        if (b.edgeGeo) b.edgeGeo.dispose();
+      });
+    };
+  }, [buildings]);
 
-  // ✅ OPTIMIZACIÓN: Guardamos referencias directas a TODOS los materiales de cada edificio.
-  // Antes: group.traverse() recorría todo el árbol de hijos cada frame (muy costoso con 45 edificios).
-  // Ahora: accedemos directo al array de materiales sin ninguna búsqueda.
+  const meshRefs     = useRef([]);
   const materialRefs = useRef([]);
 
   useFrame((state, delta) => {
@@ -75,21 +80,19 @@ export default function Obstacles() {
         group.position.z = spawnZ;
       }
 
-      // ✅ Acceso directo a materiales — sin traverse
       if (isSpace && materialRefs.current[idx]) {
         const dist = Math.abs(group.position.z);
         const appearanceThreshold = 800;
-        const solidThreshold = 300;
+        const solidThreshold      = 300;
         let opacity =
-          1 -
-          (dist - solidThreshold) / (appearanceThreshold - solidThreshold);
+          1 - (dist - solidThreshold) / (appearanceThreshold - solidThreshold);
         opacity = THREE.MathUtils.clamp(opacity, 0, 1);
 
         for (const mat of materialRefs.current[idx]) {
-          mat.transparent = opacity < 1;
-          mat.opacity = opacity;
+          mat.transparent        = opacity < 1;
+          mat.opacity            = opacity;
           if (mat.emissiveIntensity !== undefined) {
-            mat.emissiveIntensity = opacity * 10;
+            mat.emissiveIntensity  = opacity * 10;
           }
         }
       }
@@ -98,93 +101,60 @@ export default function Obstacles() {
 
   return (
     <group>
-      {buildings.map((b, i) => (
-        <group
-          key={b.id}
-          ref={(el) => (meshRefs.current[i] = el)}
-          position={[b.x, dimension === "SPACE" ? -25 : b.height / 2, b.initZ]}
-        >
-          {/* 1. CUERPO DEL EDIFICIO */}
-          <mesh>
-            <boxGeometry args={[b.width, b.height, b.width]} />
-            <meshStandardMaterial
-              ref={(mat) => {
-                if (mat) {
-                  if (!materialRefs.current[i]) materialRefs.current[i] = [];
-                  materialRefs.current[i][0] = mat;
+      {buildings.map((b, idx) => {
+        const emissiveColor = new THREE.Color(b.color);
+        const mats = [];
+
+        return (
+          <group
+            key={b.id}
+            ref={(el) => (meshRefs.current[idx] = el)}
+            position={[b.x, b.height / 2, b.initZ]}
+          >
+            <mesh
+              ref={(el) => {
+                if (el?.material) {
+                  mats.push(el.material);
+                  materialRefs.current[idx] = mats;
                 }
               }}
-              color="#050505"
-              metalness={0.9}
-              roughness={0.1}
-            />
-          </mesh>
-
-          {/* 2. ESQUELETO EXTERIOR — usa geometría cacheada del useMemo */}
-          <lineSegments>
-            <primitive object={b.edgeGeo} attach="geometry" />
-            <lineBasicMaterial
-              ref={(mat) => {
-                if (mat) {
-                  if (!materialRefs.current[i]) materialRefs.current[i] = [];
-                  materialRefs.current[i][1] = mat;
-                }
-              }}
-              color={b.color}
-              transparent
-              opacity={0.3}
-            />
-          </lineSegments>
-
-          {/* 3. BANDAS HORIZONTALES */}
-          {[0.2, 0.5, 0.8].map((factor, idx) => (
-            <mesh key={idx} position={[0, b.height * (factor - 0.5), 0]}>
-              <boxGeometry args={[b.width + 0.05, 0.1, b.width + 0.05]} />
+            >
+              <boxGeometry args={[b.width, b.height, b.width]} />
               <meshStandardMaterial
-                ref={(mat) => {
-                  if (mat) {
-                    if (!materialRefs.current[i]) materialRefs.current[i] = [];
-                    materialRefs.current[i][2 + idx] = mat;
-                  }
-                }}
-                color={b.color}
-                emissive={b.color}
-                emissiveIntensity={2}
+                color="#050510"
+                emissive={emissiveColor}
+                emissiveIntensity={isSpace ? 10 : 3}
                 transparent
-                opacity={0.4}
+                opacity={isSpace ? 0 : 0.9}
               />
             </mesh>
-          ))}
 
-          {/* 4. RAMIFICACIONES TÉCNICAS */}
-          {b.branches.map((branch, idx) => (
-            <group key={idx}>
-              <pointLight
-                position={[branch.pos[0], branch.pos[1], branch.pos[2] - 0.2]}
-                distance={2}
-                intensity={0.5}
-                color={b.color}
-              />
-              <mesh position={branch.pos}>
-                <boxGeometry args={branch.size} />
+            <lineSegments>
+              <primitive object={b.edgeGeo} attach="geometry" />
+              <lineBasicMaterial color={b.color} />
+            </lineSegments>
+
+            {b.branches.map((br, bi) => (
+              <mesh key={bi} position={br.pos}>
+                <boxGeometry args={br.size} />
                 <meshStandardMaterial
-                  ref={(mat) => {
-                    if (mat) {
-                      if (!materialRefs.current[i])
-                        materialRefs.current[i] = [];
-                      materialRefs.current[i][5 + idx] = mat;
+                  color="#050510"
+                  emissive={emissiveColor}
+                  emissiveIntensity={isSpace ? 8 : 2}
+                  transparent
+                  opacity={isSpace ? 0 : 0.7}
+                  ref={(el) => {
+                    if (el) {
+                      mats.push(el);
+                      materialRefs.current[idx] = mats;
                     }
                   }}
-                  color={b.color}
-                  emissive={b.color}
-                  emissiveIntensity={2}
-                  toneMapped={false}
                 />
               </mesh>
-            </group>
-          ))}
-        </group>
-      ))}
+            ))}
+          </group>
+        );
+      })}
     </group>
   );
 }

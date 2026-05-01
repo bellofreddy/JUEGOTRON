@@ -14,7 +14,11 @@ export default function LightCycle() {
   const meshRef = useRef();
   const trailRef = useRef();
   const matRef = useRef();
-  const { lane, moveLeft, moveRight, isPaused } = useGameStore();
+  // PARCHE: selectores granulares
+  const lane      = useGameStore((s) => s.lane);
+  const isPaused  = useGameStore((s) => s.isPaused);
+  const moveLeft  = useGameStore((s) => s.moveLeft);
+  const moveRight = useGameStore((s) => s.moveRight);
 
   // Guardamos el historial de posiciones mundo
   const history = useRef([]);

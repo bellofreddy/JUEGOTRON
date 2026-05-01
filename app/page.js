@@ -163,6 +163,251 @@ function injectCSS() {
   document.head.appendChild(s);
 }
 
+/* ─────────────────────────────────────────
+   DETECCIÓN DE DISPOSITIVO MÓVIL
+   Se detecta una sola vez al montar. Cubre:
+   · Touch nativo (smartphones/tablets)
+   · User-Agent como fallback
+───────────────────────────────────────── */
+function useIsMobile() {
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const touch = typeof window !== "undefined" && (
+      "ontouchstart" in window ||
+      navigator.maxTouchPoints > 0
+    );
+    const ua = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
+    setIsMobile(touch || ua);
+  }, []);
+  return isMobile;
+}
+
+/* ─────────────────────────────────────────
+   HOOK: CONTROLES TÁCTILES
+   Maneja swipe (deslizar) + tap rápido.
+   · Swipe horizontal  → cambiar carril (moveLeft / moveRight)
+   · Swipe vertical    → (reservado para altura futura)
+   · Tap simple        → pausa / reanuda
+   Umbral de swipe: 35px para ser responsivo pero no accidental.
+   Se adjunta al elemento raíz del juego para capturar toda la pantalla.
+───────────────────────────────────────── */
+function useTouchControls({ enabled, moveLeft, moveRight, togglePause, isPaused }) {
+  const touchStart = useRef(null);
+
+  useEffect(() => {
+    if (!enabled) return;
+
+    const SWIPE_THRESHOLD   = 35;  // px mínimos para registrar swipe
+    const TAP_MAX_DISTANCE  = 12;  // px máximos para registrar como tap
+    const TAP_MAX_DURATION  = 200; // ms máximos para registrar como tap
+
+    const onTouchStart = (e) => {
+      const t = e.touches[0];
+      touchStart.current = { x: t.clientX, y: t.clientY, time: Date.now() };
+    };
+
+    const onTouchEnd = (e) => {
+      if (!touchStart.current) return;
+      const t = e.changedTouches[0];
+      const dx = t.clientX - touchStart.current.x;
+      const dy = t.clientY - touchStart.current.y;
+      const dt = Date.now() - touchStart.current.time;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+
+      // Tap: sin movimiento significativo
+      if (dist < TAP_MAX_DISTANCE && dt < TAP_MAX_DURATION) {
+        togglePause();
+        touchStart.current = null;
+        return;
+      }
+
+      // Swipe: eje dominante horizontal
+      if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > SWIPE_THRESHOLD) {
+        if (dx < 0) moveLeft();
+        else        moveRight();
+      }
+      // Swipe vertical: reservado (altura)
+      // else if (Math.abs(dy) > SWIPE_THRESHOLD) { ... }
+
+      touchStart.current = null;
+    };
+
+    const onTouchCancel = () => { touchStart.current = null; };
+
+    window.addEventListener("touchstart",  onTouchStart,  { passive: true });
+    window.addEventListener("touchend",    onTouchEnd,    { passive: true });
+    window.addEventListener("touchcancel", onTouchCancel, { passive: true });
+
+    return () => {
+      window.removeEventListener("touchstart",  onTouchStart);
+      window.removeEventListener("touchend",    onTouchEnd);
+      window.removeEventListener("touchcancel", onTouchCancel);
+    };
+  }, [enabled, moveLeft, moveRight, togglePause, isPaused]);
+}
+
+/* ─────────────────────────────────────────
+   COMPONENTE: HUD TÁCTIL
+   Botones D-pad visibles solo en móvil,
+   superpuestos sobre el juego en la zona
+   inferior de la pantalla.
+   Diseño neón consistente con el resto del UI.
+   · Botones izq/der para carril
+   · Botón central grande = pausa
+   Se usan onPointerDown para respuesta inmediata
+   (más rápido que onClick en touch).
+───────────────────────────────────────── */
+function MobileDpad({ moveLeft, moveRight, togglePause, isPaused }) {
+  const btnBase = {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    background: "rgba(0,4,10,0.75)",
+    border: "1.5px solid rgba(0,247,255,0.35)",
+    borderRadius: "50%",
+    color: "var(--cyan)",
+    fontFamily: "var(--font-display)",
+    fontWeight: 700,
+    cursor: "pointer",
+    userSelect: "none",
+    WebkitTapHighlightColor: "transparent",
+    touchAction: "manipulation",
+    boxShadow: "0 0 12px rgba(0,247,255,0.15), inset 0 0 8px rgba(0,247,255,0.05)",
+    transition: "background 0.1s, box-shadow 0.1s",
+    flexShrink: 0,
+  };
+
+  const handlePress = (fn) => (e) => {
+    e.preventDefault();
+    // Flash visual: el estado se maneja en CSS via :active
+    fn();
+  };
+
+  return (
+    <div
+      style={{
+        position: "absolute",
+        bottom: 32,
+        left: 0,
+        right: 0,
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        padding: "0 24px",
+        pointerEvents: "none",
+        zIndex: 60,
+      }}
+    >
+      {/* ── Flecha IZQUIERDA ── */}
+      <button
+        onPointerDown={handlePress(moveLeft)}
+        style={{
+          ...btnBase,
+          width: 72,
+          height: 72,
+          fontSize: "1.8rem",
+          pointerEvents: "all",
+        }}
+      >
+        ◀
+      </button>
+
+      {/* ── Centro: PAUSA ── */}
+      <button
+        onPointerDown={handlePress(togglePause)}
+        style={{
+          ...btnBase,
+          width: 54,
+          height: 54,
+          fontSize: "1rem",
+          letterSpacing: "0.05em",
+          border: isPaused
+            ? "1.5px solid var(--cyan)"
+            : "1.5px solid rgba(0,247,255,0.2)",
+          background: isPaused
+            ? "rgba(0,247,255,0.18)"
+            : "rgba(0,4,10,0.6)",
+          pointerEvents: "all",
+        }}
+      >
+        {isPaused ? "▶" : "⏸"}
+      </button>
+
+      {/* ── Flecha DERECHA ── */}
+      <button
+        onPointerDown={handlePress(moveRight)}
+        style={{
+          ...btnBase,
+          width: 72,
+          height: 72,
+          fontSize: "1.8rem",
+          pointerEvents: "all",
+        }}
+      >
+        ▶
+      </button>
+    </div>
+  );
+}
+
+/* ─────────────────────────────────────────
+   COMPONENTE: INDICADOR DE SWIPE
+   Aparece solo la primera vez que el usuario
+   entra al juego en móvil para enseñar el gesto.
+   Se desvanece después de 3 segundos.
+───────────────────────────────────────── */
+function SwipeHint() {
+  const [visible, setVisible] = useState(true);
+  useEffect(() => {
+    const t = setTimeout(() => setVisible(false), 3200);
+    return () => clearTimeout(t);
+  }, []);
+
+  if (!visible) return null;
+
+  return (
+    <div
+      style={{
+        position: "absolute",
+        bottom: 130,
+        left: "50%",
+        transform: "translateX(-50%)",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        gap: 6,
+        zIndex: 61,
+        pointerEvents: "none",
+        animation: "fade-in 0.4s ease both",
+        opacity: visible ? 1 : 0,
+        transition: "opacity 0.6s ease",
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          gap: 20,
+          alignItems: "center",
+          color: "rgba(0,247,255,0.5)",
+          fontSize: "1.6rem",
+        }}
+      >
+        <span style={{ animation: "slide-in-top 0.6s 0.1s ease both", opacity: 0 }}>←</span>
+        <span style={{
+          fontFamily: "var(--font-mono)",
+          fontSize: "0.55rem",
+          letterSpacing: "0.2em",
+          color: "rgba(0,247,255,0.35)",
+          whiteSpace: "nowrap",
+        }}>
+          DESLIZA O USA LOS BOTONES
+        </span>
+        <span style={{ animation: "slide-in-top 0.6s 0.2s ease both", opacity: 0 }}>→</span>
+      </div>
+    </div>
+  );
+}
+
 /* ── Componente: Barra de Progreso al Portal ──
    Lógica sincronizada con Portal.jsx:
      · PORTAL_SCORE_THRESHOLD = 300  → portal se activa (setPortalActive)
@@ -750,13 +995,13 @@ function GameOverScreen({ score, onRetry }) {
 }
 
 /* ── Componente: Menú Principal ── */
-function MainMenu({ quality, setQuality, onStart }) {
+function MainMenu({ quality, setQuality, onStart, isMobile }) {
   const [hovered, setHovered] = useState(false);
   const highScore = useGameStore((state) => state.highScore);
   const QUALITY_OPTIONS = [
-    { id: "low", label: "BAJA", sub: "60+ FPS" },
+    { id: "low",    label: "BAJA",  sub: "60+ FPS"  },
     { id: "medium", label: "MEDIA", sub: "30-60 FPS" },
-    { id: "high", label: "ALTA", sub: "GPU req." },
+    { id: "high",   label: "ALTA",  sub: "GPU req."  },
   ];
 
   return (
@@ -908,7 +1153,7 @@ function MainMenu({ quality, setQuality, onStart }) {
         </button>
       </div>
 
-      {/* Controles */}
+      {/* Controles — adaptativos: teclado en desktop, gestos en móvil */}
       <div
         style={{
           position: "absolute",
@@ -918,197 +1163,411 @@ function MainMenu({ quality, setQuality, onStart }) {
           color: "rgba(255,255,255,0.2)",
           letterSpacing: "0.15em",
           display: "flex",
-          gap: 24,
+          gap: isMobile ? 16 : 24,
           animation: "fade-in 1s 0.8s ease both",
           opacity: 0,
+          flexWrap: "wrap",
+          justifyContent: "center",
+          padding: "0 20px",
+          textAlign: "center",
         }}
       >
-        <span>[A/D] CARRIL</span>
-        <span>[W/S] ALTURA</span>
-        <span>[ESC] PAUSA</span>
+        {isMobile ? (
+          <>
+            <span>← → DESLIZA CARRIL</span>
+            <span>TAP PAUSA</span>
+          </>
+        ) : (
+          <>
+            <span>[A/D] CARRIL</span>
+            <span>[W/S] ALTURA</span>
+            <span>[ESC] PAUSA</span>
+          </>
+        )}
       </div>
     </div>
   );
 }
+
+/* ═══════════════════════════════════════════════════════════════════
+   MOTOR DE AUDIO — TRON LEGACY ENGINE
+   ───────────────────────────────────────────────────────────────────
+   Inspirado en la banda sonora de Daft Punk para Tron: Legacy (2010).
+   Arquitectura de 5 capas sincronizadas con el estado del juego:
+
+   1. KICK        — bombo electrónico con pitch-sweep (estilo Derezzed)
+   2. HIHAT        — ruido filtrado con hi-pass (snappy, digital)
+   3. BASS         — sawtooth con filtro LP resonante (The Grid / End of Line)
+   4. ARPEGGIO     — square wave octavado (Derezzed / Recognizer)
+   5. PAD          — triángulos en acorde (orquesta sintética, Overture)
+
+   Escalas por dimensión:
+   · GRID  → C# menor natural   (oscuro, tenso, digital)   BPM base: 114
+   · SPACE → C# frigio           (más agresivo, máquinas)   BPM base: 126
+   · REAL  → A menor natural    (cálido, orgánico, humano)  BPM base: 102
+
+   Cadena de señal:
+   osciladores → filter → gain → [reverb wet] ─┐
+                                                ├→ compressor → master → output
+                              [delay feedback] ─┘
+
+   El tempo se acelera dinámicamente con la velocidad del jugador.
+   Al cruzar portales hay una transición suave de 2s entre tonalidades.
+═══════════════════════════════════════════════════════════════════ */
 
 /* ─────────────────────────────────────────
    COMPONENTE PRINCIPAL
 ───────────────────────────────────────── */
 function createGameMusic() {
   if (typeof window === "undefined") return null;
-
   const AudioContext = window.AudioContext || window.webkitAudioContext;
   if (!AudioContext) return null;
 
-  const ctx = new AudioContext();
-  const master = ctx.createGain();
+  const ctx        = new AudioContext();
+  const master     = ctx.createGain();
   const compressor = ctx.createDynamicsCompressor();
-  const delay = ctx.createDelay(1.0);
-  const delayFeedback = ctx.createGain();
-  const delayWet = ctx.createGain();
 
+  // ── Reverb sintético (convolution simulada con delay en bucle corto) ──
+  const reverbDelay    = ctx.createDelay(0.08);
+  const reverbFeedback = ctx.createGain();
+  const reverbWet      = ctx.createGain();
+  reverbDelay.delayTime.value    = 0.055;
+  reverbFeedback.gain.value      = 0.38;   // cola larga tipo sala grande
+  reverbWet.gain.value           = 0.22;
+
+  // ── Delay estereofónico (sello Daft Punk — 1/8 de nota) ──
+  const echoDelay    = ctx.createDelay(0.5);
+  const echoFeedback = ctx.createGain();
+  const echoWet      = ctx.createGain();
+  echoDelay.delayTime.value  = 0.125;      // 1/8 a 120bpm
+  echoFeedback.gain.value    = 0.28;
+  echoWet.gain.value         = 0.16;
+
+  // ── Compresor (limiter suave, estilo mastering electrónico) ──
+  compressor.threshold.value = -14;
+  compressor.knee.value      = 10;
+  compressor.ratio.value     = 6;
+  compressor.attack.value    = 0.003;
+  compressor.release.value   = 0.12;
+
+  // ── Routing ──
   master.gain.value = 0;
-  compressor.threshold.value = -18;
-  compressor.knee.value = 18;
-  compressor.ratio.value = 5;
-  compressor.attack.value = 0.01;
-  compressor.release.value = 0.18;
-
-  delay.delayTime.value = 0.19;
-  delayFeedback.gain.value = 0.22;
-  delayWet.gain.value = 0.18;
-
   master.connect(compressor);
   compressor.connect(ctx.destination);
-  master.connect(delay);
-  delay.connect(delayFeedback);
-  delayFeedback.connect(delay);
-  delay.connect(delayWet);
-  delayWet.connect(compressor);
 
-  const root = 55;
-  const bassPattern = [0, 0, 7, 0, 10, 7, 5, 3];
-  const arpPattern = [
-    12, 19, 24, 19, 15, 22, 27, 22, 10, 17, 22, 17, 7, 15, 19, 15,
-  ];
-  let step = 0;
+  // Reverb loop
+  master.connect(reverbDelay);
+  reverbDelay.connect(reverbFeedback);
+  reverbFeedback.connect(reverbDelay);
+  reverbDelay.connect(reverbWet);
+  reverbWet.connect(compressor);
+
+  // Echo
+  master.connect(echoDelay);
+  echoDelay.connect(echoFeedback);
+  echoFeedback.connect(echoDelay);
+  echoDelay.connect(echoWet);
+  echoWet.connect(compressor);
+
+  // ── Frecuencia raíz por dimensión (en Hz, nota C# = 277.18 Hz) ──
+  //    GRID:  C#3 = 138.59 Hz  (C# menor natural)
+  //    SPACE: C#3 = 138.59 Hz  (C# frigio — mismo root, escala diferente)
+  //    REAL:  A2  = 110.00 Hz  (A menor natural)
+  const ROOT = { GRID: 138.59, SPACE: 138.59, REAL: 110.0 };
+
+  // ── Escalas en semitonos sobre el root ──
+  // C# menor natural: C# D# E F# G# A B
+  const SCALE_GRID  = [0, 2, 3, 5, 7, 8, 10, 12];
+  // C# frigio: C# D E F# G# A B (2º modo de B mayor — más oscuro)
+  const SCALE_SPACE = [0, 1, 3, 5, 7, 8, 10, 12];
+  // A menor natural: A B C D E F G
+  const SCALE_REAL  = [0, 2, 3, 5, 7, 8, 10, 12];
+
+  // ── Patrones de bajo (índices en la escala, 8 pasos) ──
+  // Inspirado en el riff de "End of Line" — root, quinta, séptima
+  const BASS_GRID  = [0, 0, 4, 0, 6, 4, 3, 1];  // C# - G# - B - C# groove
+  const BASS_SPACE = [0, 0, 0, 3, 5, 3, 1, 0];  // más repetitivo, urgente
+  const BASS_REAL  = [0, 2, 3, 2, 0, 5, 4, 2];  // A menor, más melódico
+
+  // ── Patrones de arpegio (16 pasos, una octava arriba) ──
+  // Inspirado en Derezzed — pulsante, cuadrado, mecánico
+  const ARP_GRID  = [7,12,7,10, 8,12,8,10, 5,12,5, 8, 3,10,3, 7];
+  const ARP_SPACE = [7,14,7,12, 8,14,8,12, 5,12,5,10, 3,12,3,10];
+  const ARP_REAL  = [7,10,7, 8, 5,10,5, 8, 3, 8,3, 7, 0, 7,2, 5];
+
+  // ── Acordes de pad (triadas en posición cerrada) ──
+  // Inspirado en los pads orquestales de "Overture" y "The Grid"
+  const PAD_CHORDS = {
+    GRID:  [[0,3,7], [8,12,15], [5,8,12], [3,7,10]],   // i - VI - III - VII
+    SPACE: [[0,3,7], [1,5, 8], [5,8,12], [3,6,10]],    // más disonante
+    REAL:  [[0,3,7], [5,8,12], [3,7,10], [2,5, 9]],    // Am - Dm - Em - Bm°
+  };
+
+  let step      = 0;
   let scheduler = null;
+  let curDim    = "GRID";
 
-  const freqFromSemitone = (semitone) => root * Math.pow(2, semitone / 12);
-
-  const playTone = (freq, time, duration, type, gainValue) => {
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    const filter = ctx.createBiquadFilter();
-
-    osc.type = type;
-    osc.frequency.setValueAtTime(freq, time);
-    filter.type = "lowpass";
-    filter.frequency.setValueAtTime(type === "sawtooth" ? 1100 : 2400, time);
-    filter.Q.setValueAtTime(0.8, time);
-    gain.gain.setValueAtTime(0.0001, time);
-    gain.gain.exponentialRampToValueAtTime(gainValue, time + 0.015);
-    gain.gain.exponentialRampToValueAtTime(0.0001, time + duration);
-
-    osc.connect(filter);
-    filter.connect(gain);
-    gain.connect(master);
-    osc.start(time);
-    osc.stop(time + duration + 0.05);
+  // Convierte índice de escala + octava a frecuencia absoluta
+  const scaleFreq = (scaleIdx, octave, dim) => {
+    const scale = dim === "SPACE" ? SCALE_SPACE : dim === "REAL" ? SCALE_REAL : SCALE_GRID;
+    const semitone = scale[scaleIdx % scale.length] + (octave * 12);
+    return ROOT[dim] * Math.pow(2, semitone / 12);
   };
 
-  const playKick = (time) => {
-    const osc = ctx.createOscillator();
+  // ── KICK: bombo electrónico pitch-sweep (Derezzed style) ──
+  const playKick = (time, intensity = 1.0) => {
+    const osc  = ctx.createOscillator();
     const gain = ctx.createGain();
-
+    const dist = ctx.createWaveShaper();
+    // Waveshaper suave para saturación analógica
+    const curve = new Float32Array(256);
+    for (let i = 0; i < 256; i++) {
+      const x = (i * 2) / 256 - 1;
+      curve[i] = (Math.PI + 200) * x / (Math.PI + 200 * Math.abs(x));
+    }
+    dist.curve = curve;
     osc.type = "sine";
-    osc.frequency.setValueAtTime(95, time);
-    osc.frequency.exponentialRampToValueAtTime(38, time + 0.12);
-    gain.gain.setValueAtTime(0.45, time);
-    gain.gain.exponentialRampToValueAtTime(0.0001, time + 0.16);
-
-    osc.connect(gain);
-    gain.connect(master);
-    osc.start(time);
-    osc.stop(time + 0.18);
+    osc.frequency.setValueAtTime(110, time);
+    osc.frequency.exponentialRampToValueAtTime(35, time + 0.14);
+    gain.gain.setValueAtTime(0.0001, time);
+    gain.gain.exponentialRampToValueAtTime(0.55 * intensity, time + 0.003);
+    gain.gain.exponentialRampToValueAtTime(0.0001, time + 0.22);
+    osc.connect(dist); dist.connect(gain); gain.connect(master);
+    osc.start(time); osc.stop(time + 0.25);
   };
 
-  const playHat = (time, gainValue = 0.035) => {
-    const buffer = ctx.createBuffer(1, ctx.sampleRate * 0.04, ctx.sampleRate);
-    const data = buffer.getChannelData(0);
-    for (let i = 0; i < data.length; i++) {
-      data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / data.length, 2);
+  // ── SNARE electrónico (ruido blanco + tono) ──
+  const playSnare = (time) => {
+    // Componente de ruido
+    const bufLen = ctx.sampleRate * 0.12;
+    const buf    = ctx.createBuffer(1, bufLen, ctx.sampleRate);
+    const data   = buf.getChannelData(0);
+    for (let i = 0; i < bufLen; i++)
+      data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / bufLen, 1.5);
+    const noise  = ctx.createBufferSource();
+    const nGain  = ctx.createGain();
+    const nFilt  = ctx.createBiquadFilter();
+    noise.buffer = buf;
+    nFilt.type   = "bandpass";
+    nFilt.frequency.value = 2800;
+    nFilt.Q.value         = 0.9;
+    nGain.gain.setValueAtTime(0.0001, time);
+    nGain.gain.exponentialRampToValueAtTime(0.18, time + 0.004);
+    nGain.gain.exponentialRampToValueAtTime(0.0001, time + 0.12);
+    noise.connect(nFilt); nFilt.connect(nGain); nGain.connect(master);
+    noise.start(time); noise.stop(time + 0.13);
+    // Componente tonal (crack)
+    const osc  = ctx.createOscillator();
+    const oGain= ctx.createGain();
+    osc.type   = "triangle";
+    osc.frequency.setValueAtTime(220, time);
+    osc.frequency.exponentialRampToValueAtTime(110, time + 0.06);
+    oGain.gain.setValueAtTime(0.0001, time);
+    oGain.gain.exponentialRampToValueAtTime(0.09, time + 0.003);
+    oGain.gain.exponentialRampToValueAtTime(0.0001, time + 0.07);
+    osc.connect(oGain); oGain.connect(master);
+    osc.start(time); osc.stop(time + 0.08);
+  };
+
+  // ── HIHAT: ruido hi-pass (metálico, digital) ──
+  const playHat = (time, open = false) => {
+    const bufLen = ctx.sampleRate * (open ? 0.18 : 0.04);
+    const buf    = ctx.createBuffer(1, bufLen, ctx.sampleRate);
+    const data   = buf.getChannelData(0);
+    for (let i = 0; i < bufLen; i++)
+      data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / bufLen, open ? 0.8 : 2.0);
+    const noise  = ctx.createBufferSource();
+    const gain   = ctx.createGain();
+    const filt   = ctx.createBiquadFilter();
+    noise.buffer = buf;
+    filt.type    = "highpass";
+    filt.frequency.value = 7000;
+    gain.gain.setValueAtTime(0.0001, time);
+    gain.gain.exponentialRampToValueAtTime(open ? 0.06 : 0.045, time + 0.002);
+    gain.gain.exponentialRampToValueAtTime(0.0001, time + (open ? 0.18 : 0.04));
+    noise.connect(filt); filt.connect(gain); gain.connect(master);
+    noise.start(time); noise.stop(time + (open ? 0.2 : 0.05));
+  };
+
+  // ── BAJO SAWTOOTH con filtro LP resonante (End of Line style) ──
+  const playBass = (time, freq, dur, dim) => {
+    const osc1  = ctx.createOscillator();
+    const osc2  = ctx.createOscillator(); // sub-octave para cuerpo
+    const filt  = ctx.createBiquadFilter();
+    const gain  = ctx.createGain();
+    // Filtro LP resonante — característico del bajo de Tron
+    filt.type             = "lowpass";
+    filt.frequency.setValueAtTime(400, time);
+    filt.frequency.exponentialRampToValueAtTime(dim === "REAL" ? 900 : 1400, time + 0.04);
+    filt.frequency.exponentialRampToValueAtTime(600, time + dur * 0.7);
+    filt.Q.value          = 4.5;  // resonancia pronunciada
+    osc1.type = "sawtooth";
+    osc1.frequency.setValueAtTime(freq, time);
+    osc2.type = "square";
+    osc2.frequency.setValueAtTime(freq / 2, time);
+    gain.gain.setValueAtTime(0.0001, time);
+    gain.gain.exponentialRampToValueAtTime(dim === "REAL" ? 0.065 : 0.095, time + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.0001, time + dur);
+    osc1.connect(filt); osc2.connect(filt);
+    filt.connect(gain); gain.connect(master);
+    osc1.start(time); osc1.stop(time + dur + 0.05);
+    osc2.start(time); osc2.stop(time + dur + 0.05);
+  };
+
+  // ── ARPEGIO SQUARE (Derezzed / Recognizer — mecánico, cuadrado) ──
+  const playArp = (time, freq, dur, dim) => {
+    const osc  = ctx.createOscillator();
+    const filt = ctx.createBiquadFilter();
+    const gain = ctx.createGain();
+    filt.type  = "lowpass";
+    filt.frequency.value = dim === "SPACE" ? 3200 : dim === "REAL" ? 1800 : 2600;
+    filt.Q.value         = 1.2;
+    osc.type   = "square";
+    osc.frequency.setValueAtTime(freq, time);
+    gain.gain.setValueAtTime(0.0001, time);
+    gain.gain.exponentialRampToValueAtTime(
+      dim === "SPACE" ? 0.072 : dim === "REAL" ? 0.032 : 0.055,
+      time + 0.006
+    );
+    gain.gain.exponentialRampToValueAtTime(0.0001, time + dur * 0.85);
+    osc.connect(filt); filt.connect(gain); gain.connect(master);
+    osc.start(time); osc.stop(time + dur);
+  };
+
+  // ── PAD ORQUESTAL (triángulos en acorde — Overture / The Grid) ──
+  const playPad = (time, chordSemitones, dur, dim) => {
+    chordSemitones.forEach((semi, i) => {
+      const freq = ROOT[dim] * Math.pow(2, semi / 12);
+      const osc  = ctx.createOscillator();
+      const gain = ctx.createGain();
+      const filt = ctx.createBiquadFilter();
+      filt.type  = "lowpass";
+      filt.frequency.value = 1200;
+      osc.type   = "triangle";
+      osc.frequency.setValueAtTime(freq * 2, time); // una octava arriba
+      gain.gain.setValueAtTime(0.0001, time + i * 0.018); // stagger — entrada escalonada
+      gain.gain.exponentialRampToValueAtTime(
+        dim === "REAL" ? 0.028 : 0.038,
+        time + i * 0.018 + 0.08
+      );
+      gain.gain.setValueAtTime(
+        dim === "REAL" ? 0.028 : 0.038,
+        time + dur - 0.15
+      );
+      gain.gain.exponentialRampToValueAtTime(0.0001, time + dur);
+      osc.connect(filt); filt.connect(gain); gain.connect(master);
+      osc.start(time); osc.stop(time + dur + 0.1);
+    });
+  };
+
+  // ── EFECTO PORTAL: sweep de frecuencia ascendente al cruzar ──
+  const playPortalSweep = (time, dim) => {
+    const isSpace = dim === "SPACE";
+    const startFreq = isSpace ? 200 : 400;
+    const endFreq   = isSpace ? 3200 : 800;
+    const osc  = ctx.createOscillator();
+    const gain = ctx.createGain();
+    const filt = ctx.createBiquadFilter();
+    filt.type  = "bandpass";
+    filt.Q.value = 8;
+    filt.frequency.setValueAtTime(startFreq, time);
+    filt.frequency.exponentialRampToValueAtTime(endFreq, time + 1.8);
+    osc.type   = "sawtooth";
+    osc.frequency.setValueAtTime(startFreq / 2, time);
+    osc.frequency.exponentialRampToValueAtTime(endFreq / 2, time + 1.8);
+    gain.gain.setValueAtTime(0.0001, time);
+    gain.gain.linearRampToValueAtTime(0.18, time + 0.1);
+    gain.gain.linearRampToValueAtTime(0.0001, time + 1.8);
+    osc.connect(filt); filt.connect(gain); gain.connect(master);
+    osc.start(time); osc.stop(time + 2.0);
+  };
+
+  // ── SCHEDULADOR PRINCIPAL ──
+  const scheduleStep = () => {
+    const { dimension, speed, isPaused, isGameOver } = useGameStore.getState();
+    if (isPaused || isGameOver) return 120;
+
+    // Detectar cambio de dimensión → sweep de portal
+    if (dimension !== curDim) {
+      playPortalSweep(ctx.currentTime + 0.02, dimension);
+      // Ajustar delay time al nuevo BPM
+      const newBeat = dimension === "SPACE" ? 0.476 : dimension === "REAL" ? 0.588 : 0.526;
+      echoDelay.delayTime.setTargetAtTime(newBeat / 4, ctx.currentTime, 0.5);
+      curDim = dimension;
+      step = 0; // reiniciar patrón al nuevo contexto
     }
 
-    const noise = ctx.createBufferSource();
-    const gain = ctx.createGain();
-    const filter = ctx.createBiquadFilter();
+    const dim  = dimension;
+    const time = ctx.currentTime + 0.05;
 
-    noise.buffer = buffer;
-    filter.type = "highpass";
-    filter.frequency.value = 5500;
-    gain.gain.setValueAtTime(gainValue, time);
-    gain.gain.exponentialRampToValueAtTime(0.0001, time + 0.04);
+    // Tempo dinámico: acelera con la velocidad del jugador
+    // BPM base: GRID=114, SPACE=126, REAL=102
+    const baseBPM  = dim === "SPACE" ? 126 : dim === "REAL" ? 102 : 114;
+    const speedPct = Math.min((speed - 15) / 45, 1); // 0 a velocidad inicial, 1 al máximo
+    const dynBPM   = baseBPM + speedPct * (dim === "SPACE" ? 24 : 18);
+    const beat     = 60 / dynBPM;     // duración de 1/4 de nota en segundos
+    const step16   = beat / 4;        // duración de 1/16
 
-    noise.connect(filter);
-    filter.connect(gain);
-    gain.connect(master);
-    noise.start(time);
-    noise.stop(time + 0.05);
-  };
+    const bassPattern = dim === "SPACE" ? BASS_SPACE : dim === "REAL" ? BASS_REAL : BASS_GRID;
+    const arpPattern  = dim === "SPACE" ? ARP_SPACE  : dim === "REAL" ? ARP_REAL  : ARP_GRID;
+    const padChords   = PAD_CHORDS[dim];
 
-  const scheduleStep = () => {
-    const { dimension, speed } = useGameStore.getState();
-    const time = ctx.currentTime + 0.06;
-    const isSpace = dimension === "SPACE";
-    const isReal = dimension === "REAL";
-    const tempoScale = Math.min(speed / 60, 1);
-    const beat = isSpace ? 0.15 : isReal ? 0.22 : 0.18;
-    const bassGain = isReal ? 0.045 : 0.075;
-    const arpGain = isReal ? 0.025 : isSpace ? 0.07 : 0.052;
+    const s = step % 16; // posición en el compás de 16 steps
 
-    if (step % 4 === 0) playKick(time);
-    if (step % 2 === 1) playHat(time, isSpace ? 0.055 : 0.035);
+    // ── DRUMS: patrón 4/4 clásico electrónico ──
+    if (s % 4 === 0)               playKick(time, 1.0);           // beats 1,2,3,4
+    if (s === 4 || s === 12)       playKick(time, 0.6);           // ghost kicks
+    if (s === 4 || s === 12)       playSnare(time);               // snare en 2 y 4
+    if (s % 2 === 1)               playHat(time, false);          // hi-hat cada 1/8
+    if (s === 6 || s === 14)       playHat(time, true);           // open hat sincopado
+    // En SPACE: hi-hats más frecuentes (cada 1/16)
+    if (dim === "SPACE" && s % 2 === 0 && s % 4 !== 0) playHat(time, false);
 
-    playTone(
-      freqFromSemitone(bassPattern[step % bassPattern.length] - 12),
-      time,
-      beat * 1.5,
-      "sawtooth",
-      bassGain,
-    );
-    playTone(
-      freqFromSemitone(
-        arpPattern[step % arpPattern.length] + (isSpace ? 12 : 0),
-      ),
-      time,
-      beat * 0.8,
-      "square",
-      arpGain,
-    );
+    // ── BAJO: 8 steps (cada 1/8 de nota) ──
+    if (s % 2 === 0) {
+      const bassIdx  = Math.floor(s / 2);
+      const bassFreq = scaleFreq(bassPattern[bassIdx % bassPattern.length], 0, dim);
+      playBass(time, bassFreq, step16 * 1.8, dim);
+    }
 
-    if (step % 8 === 0) {
-      const chord = isReal ? [0, 5, 10] : [0, 7, 10];
-      chord.forEach((note, i) => {
-        playTone(
-          freqFromSemitone(note + 12),
-          time + i * 0.015,
-          beat * 5,
-          "triangle",
-          isReal ? 0.018 : 0.025,
-        );
-      });
+    // ── ARPEGIO: 16 steps (cada 1/16) ──
+    const arpFreq = scaleFreq(arpPattern[s % arpPattern.length], 1, dim);
+    playArp(time, arpFreq, step16 * 0.75, dim);
+
+    // ── PAD: cada 4 beats (cambio de acorde cada compás) ──
+    if (s === 0) {
+      const chordIdx = Math.floor(step / 16) % padChords.length;
+      playPad(time, padChords[chordIdx], beat * 4.2, dim);
     }
 
     step = (step + 1) % 64;
-    return Math.max(90, beat * 1000 - tempoScale * 22);
+    return step16 * 1000 - 8; // ms hasta el próximo step (con 8ms de buffer)
   };
 
   const tick = () => {
     const nextMs = scheduleStep();
-    scheduler = window.setTimeout(tick, nextMs);
+    scheduler = window.setTimeout(tick, Math.max(40, nextMs));
   };
 
   return {
     async start() {
       if (ctx.state === "suspended") await ctx.resume();
       master.gain.cancelScheduledValues(ctx.currentTime);
-      master.gain.linearRampToValueAtTime(0.28, ctx.currentTime + 0.5);
+      master.gain.linearRampToValueAtTime(0.30, ctx.currentTime + 0.8);
       if (!scheduler) tick();
     },
     setPaused(paused) {
       master.gain.cancelScheduledValues(ctx.currentTime);
       master.gain.linearRampToValueAtTime(
-        paused ? 0.03 : 0.28,
-        ctx.currentTime + 0.25,
+        paused ? 0.04 : 0.30,
+        ctx.currentTime + 0.3,
       );
     },
     stop() {
-      if (scheduler) window.clearTimeout(scheduler);
-      scheduler = null;
+      if (scheduler) { window.clearTimeout(scheduler); scheduler = null; }
       master.gain.cancelScheduledValues(ctx.currentTime);
-      master.gain.linearRampToValueAtTime(0.0001, ctx.currentTime + 0.25);
-      window.setTimeout(() => ctx.close(), 320);
+      master.gain.linearRampToValueAtTime(0.0001, ctx.currentTime + 0.4);
+      window.setTimeout(() => { try { ctx.close(); } catch(e){} }, 450);
     },
   };
 }
@@ -1127,11 +1586,25 @@ export default function Home() {
     dimension,
     portalActive,
     portalCollected,
-    gameStarted, // ← Añade esta
+    gameStarted,
     startGame,
+    moveLeft,
+    moveRight,
   } = useGameStore();
 
-  const musicRef = useRef(null);
+  const isMobile  = useIsMobile();
+  const musicRef  = useRef(null);
+  // Solo mostrar el hint de swipe la primera vez que empieza en móvil
+  const [showSwipeHint, setShowSwipeHint] = useState(false);
+
+  // Controles táctiles — solo activos cuando el juego está corriendo en móvil
+  useTouchControls({
+    enabled:     isMobile && gameStarted && !showGameOverUI,
+    moveLeft,
+    moveRight,
+    togglePause,
+    isPaused,
+  });
 
   // Tecla ESC para pausar
   useEffect(() => {
@@ -1161,8 +1634,8 @@ export default function Home() {
   };
 
   const handleStart = () => {
-    // 3. Llamamos a la función de la Store
     startGame();
+    if (isMobile) setShowSwipeHint(true);
     if (!musicRef.current) {
       musicRef.current = createGameMusic();
     }
@@ -1209,6 +1682,17 @@ export default function Home() {
             togglePause={togglePause}
             dimension={dimension}
           />
+          {/* D-pad táctil — solo en móvil */}
+          {isMobile && (
+            <MobileDpad
+              moveLeft={moveLeft}
+              moveRight={moveRight}
+              togglePause={togglePause}
+              isPaused={isPaused}
+            />
+          )}
+          {/* Hint de swipe — primera vez en móvil */}
+          {isMobile && showSwipeHint && <SwipeHint />}
         </>
       )}
 
@@ -1226,6 +1710,7 @@ export default function Home() {
           quality={quality}
           setQuality={setQuality}
           onStart={handleStart}
+          isMobile={isMobile}
         />
       )}
     </main>

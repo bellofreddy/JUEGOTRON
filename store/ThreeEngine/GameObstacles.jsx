@@ -201,9 +201,16 @@ function RealVehicle({ position, type = "car", direction = "same" }) {
 }
 
 export default function GameObstacles() {
-  const groupRef = useRef();
-  const { speed, lane, setGameOver, score, dimension, isPaused, isGameOver } =
-    useGameStore();
+  const groupRef   = useRef();
+  // PARCHE: selectores granulares → este componente ya NO re-renderiza por cambio de score
+  const speed      = useGameStore((s) => s.speed);
+  const lane       = useGameStore((s) => s.lane);
+  const dimension  = useGameStore((s) => s.dimension);
+  const isPaused   = useGameStore((s) => s.isPaused);
+  const isGameOver = useGameStore((s) => s.isGameOver);
+  const setGameOver= useGameStore((s) => s.setGameOver);
+  // score solo se lee en useFrame vía getState() para no re-renderizar
+  
 
   const [waves, setWaves] = useState(() =>
     Array.from({ length: POOL_SIZE }, (_, i) => generateWave(i, 0))
@@ -238,7 +245,7 @@ export default function GameObstacles() {
         prev.map((wave) => {
           if (wave.z + groupZ > RESET_THRESHOLD) {
             return {
-              ...generateWave(wave.id, score),
+              ...generateWave(wave.id, useGameStore.getState().score),
               z: wave.z - POOL_SIZE * OBSTACLE_SPACING,
             };
           }
