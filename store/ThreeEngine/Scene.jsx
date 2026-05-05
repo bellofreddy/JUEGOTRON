@@ -232,7 +232,7 @@ export default function Scene({ gameStarted }) {
         <OrbitControls 
         enableDamping={true}       // Movimiento suave "elástico"
         dampingFactor={0.05}       // Qué tan suave es el frenado
-        rotateSpeed={0.5}          // Velocidad de rotación
+                // Velocidad de rotación
         maxPolarAngle={Math.PI / 2.1} // Bloquea la cámara para no ver debajo del suelo
         minDistance={10}           // Zoom máximo hacia adentro
         maxDistance={100}          // Zoom máximo hacia afuera
