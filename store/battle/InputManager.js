@@ -1,6 +1,7 @@
 // InputManager.js — Singleton de input estilo AAA
 // El game loop JALA el estado — no escucha eventos
 // Se inicializa una sola vez y persiste entre fases
+// ✅ Soporte móvil agregado: simulateDown / simulateUp + detección táctil automática
 
 class InputManager {
   constructor() {
@@ -47,11 +48,35 @@ class InputManager {
     return result;
   }
 
-  // Simular press desde UI (botón en pantalla)
+  // Simular press desde UI (botón en pantalla) — one-shot (100ms)
   simulatePress(code) {
     this._pressed[code] = true;
     this._keys[code]    = true;
     setTimeout(() => { this._keys[code] = false; }, 100);
+  }
+
+  // ✅ NUEVO — Mantener tecla presionada (mientras dedo está tocando)
+  // Usar con touchstart / pointerdown en botones virtuales
+  simulateDown(code) {
+    if (!this._keys[code]) {
+      this._pressed[code] = true; // dispara wasPressed en el próximo frame
+    }
+    this._keys[code] = true;
+  }
+
+  // ✅ NUEVO — Soltar tecla (cuando el dedo se levanta)
+  // Usar con touchend / pointerup en botones virtuales
+  simulateUp(code) {
+    this._keys[code]    = false;
+    this._pressed[code] = false;
+  }
+
+  // ✅ NUEVO — Detecta si el dispositivo es táctil
+  static isTouchDevice() {
+    return (
+      typeof window !== "undefined" &&
+      ("ontouchstart" in window || navigator.maxTouchPoints > 0)
+    );
   }
 }
 
